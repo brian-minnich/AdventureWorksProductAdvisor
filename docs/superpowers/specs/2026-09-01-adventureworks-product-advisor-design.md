@@ -10,10 +10,14 @@ does not repeat what's unchanged there.
 1. **V1 scope**: toggle-and-retest, not side-by-side. The mode toggle switches which pipeline
    answers the next question; a side-by-side comparison view (run both pipelines on one question,
    show both answers) is an explicit v2 candidate, not part of this build.
-2. **Top-N reviews retrieved by the C# similarity ranker**: a number input on the page, default
-   `5`, sent per-request as part of the ask payload. It only affects `CSharpAskService`.
-   `StoredProcAskService` ignores it — the stored procedure's `VECTOR_SEARCH` retrieval count is
-   fixed in existing T-SQL that this project doesn't modify (per the brief's non-goals).
+2. **Top-N reviews retrieved**: a native number-spinner input (`<input type="number" min="1"
+   max="10" step="1">`) on the page, default `5`, sent per-request as part of the ask payload.
+   Unlike the original draft, this now applies to **both** pipelines: `CSharpAskService` passes it
+   to `SimilarityRanker`, and `StoredProcAskService` forwards it as a new `@TopN` parameter to
+   `dbo.AskProductQuestion` (see "Stored Procedure Changes" below). The spinner's `min`/`max` are a
+   UI convenience only — `AskController` independently validates `TopN` is in `[1, 10]` server-side
+   and rejects the request with a clear error otherwise, since a direct POST to the API can bypass
+   HTML input attributes entirely.
 3. **Provider design for `IEmbeddingService`/`IChatCompletionService`**: the interfaces never leak
    Azure-specific shapes — method signatures use plain types (`string`, `float[]`), and all Azure
    REST details (endpoint, headers, JSON payload/response shape) stay inside
@@ -46,6 +50,45 @@ The MVC template generates more than this project needs. After scaffolding:
   `Data`, `Models`, `Sql`. (`Controllers`, `Views`, `Scripts` already exist from the template.)
 - No membership/identity scaffolding is added (non-goal: no auth).
 
+## Stored Procedure Changes (current state now known)
+
+The current `dbo.AskProductQuestion` definition is checked in at `sql/dbo.AskProductQuestion.sql`
+(saved via SSMS's "Generate Script As", currently UTF-16LE — will be normalized to UTF-8 when
+this file is next touched in slice 2, for sane git diffs). Its retrieval step is:
+
+```sql
+SELECT TOP 5 WITH APPROXIMATE
+    p.Name AS ProductName, p.ListPrice, pc.Name AS Category, r.Rating, r.ReviewTitle, r.ReviewText
+FROM VECTOR_SEARCH(
+    TABLE = dbo.ProductReview AS r, COLUMN = ReviewVector,
+    SIMILAR_TO = @questionVector, METRIC = 'cosine'
+) AS vs
+INNER JOIN SalesLT.Product p ON r.ProductID = p.ProductID
+INNER JOIN SalesLT.ProductCategory pc ON p.ProductCategoryID = pc.ProductCategoryID
+ORDER BY vs.distance
+FOR JSON PATH;
+```
+
+Slice 2's modification (alongside the already-planned `@MaxTokens` parameterization) adds
+`@TopN INT = 5` and changes `TOP 5` to `TOP (@TopN)`:
+
+```sql
+CREATE OR ALTER PROCEDURE dbo.AskProductQuestion
+    @Question NVARCHAR(1000),
+    @MaxTokens INT = 500,
+    @TopN INT = 5,
+    @Answer NVARCHAR(MAX) OUTPUT
+AS
+BEGIN
+    ...
+    SET @context = (
+        SELECT TOP (@TopN) WITH APPROXIMATE
+            ...
+    );
+    ...
+END;
+```
+
 ## Interface Shapes
 
 ```csharp
@@ -65,13 +108,13 @@ public interface IChatCompletionService
 }
 ```
 
-- `StoredProcAskService.AskAsync` accepts `topN` to satisfy the interface but ignores it (documented
-  inline with why, since a silently-ignored parameter is exactly the kind of non-obvious behavior
-  worth a comment).
+- `StoredProcAskService.AskAsync` passes `topN` straight through as the `@TopN` parameter on the
+  `dbo.AskProductQuestion` call.
 - `AskRequest` (bound from the JSON POST body) carries `Question`, `Mode`, and `TopN` (defaults to
   `5` if omitted). `MaxCompletionTokens` is **not** client-supplied — it's read server-side from
   `Web.config` (`AppSettings["MaxCompletionTokens"]`) so the cost guard can't be overridden from
-  the browser.
+  the browser. `AskController` validates `TopN` is in `[1, 10]` before invoking either pipeline,
+  returning a clear error otherwise.
 
 ## First Slice: C# Pipeline Walking Skeleton
 
@@ -104,8 +147,8 @@ once this works.
 - Unit tests (see below).
 
 **Explicitly deferred to slice 2:** `StoredProcAskService`, `dbo.CallLog` table and logging,
-daily call cap enforcement in `AskController`, the `@MaxTokens` parameterization of
-`dbo.AskProductQuestion`.
+daily call cap enforcement in `AskController`, the `@MaxTokens`/`@TopN` parameterization of
+`dbo.AskProductQuestion` (current definition captured in `sql/dbo.AskProductQuestion.sql`).
 
 ## Testing (Slice 1)
 
@@ -122,8 +165,9 @@ daily call cap enforcement in `AskController`, the `@MaxTokens` parameterization
   shape (endpoint, `api-key` header, JSON payload) and correct parsing of the response into
   `float[]` / `string`. No real network calls, no token cost, runs offline.
 - **`AskController`** — mock `IAskService`; verify it resolves the implementation based on `Mode`,
-  passes `TopN` and the server-side `MaxCompletionTokens` through correctly, and shapes the HTTP
-  response as expected.
+  passes `TopN` and the server-side `MaxCompletionTokens` through correctly, shapes the HTTP
+  response as expected, and rejects `TopN` values outside `[1, 10]` with a clear error without
+  invoking `IAskService`.
 
 **Not unit tested in slice 1:**
 - `ReviewRepository` — a thin ADO.NET wrapper; unit testing it would require either a real
