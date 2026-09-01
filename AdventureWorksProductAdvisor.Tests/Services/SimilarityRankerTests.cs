@@ -59,5 +59,21 @@ namespace AdventureWorksProductAdvisor.Tests.Services
 
             CollectionAssert.AreEqual(new[] { 2 }, result.Select(r => r.ReviewId).ToList());
         }
+
+        [TestMethod]
+        public void GetTopN_IgnoresReviewsWithMismatchedEmbeddingLength()
+        {
+            var query = new float[] { 1f, 0f };
+            var reviews = new List<ReviewRecord>
+            {
+                new ReviewRecord { ReviewId = 1, Embedding = new float[] { 1f, 0f } },
+                new ReviewRecord { ReviewId = 2, Embedding = new float[] { 1f, 0f, 0f } }
+            };
+            var ranker = new SimilarityRanker();
+
+            var result = ranker.GetTopN(reviews, query, 5);
+
+            CollectionAssert.AreEqual(new[] { 1 }, result.Select(r => r.ReviewId).ToList());
+        }
     }
 }

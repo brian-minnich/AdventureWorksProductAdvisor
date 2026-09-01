@@ -29,7 +29,7 @@ namespace AdventureWorksProductAdvisor.Tests.Services
             var chatCompletionService = new Mock<IChatCompletionService>();
             chatCompletionService
                 .Setup(c => c.GetCompletionAsync(
-                    It.Is<string>(p => p.Contains("Mountain Bike") && p.Contains("What bike is best for trails?")),
+                    It.Is<string>(p => p.Contains("Mountain Bike") && p.Contains("What bike is best for trails?") && !p.Contains("Road Bike")),
                     500))
                 .ReturnsAsync("The Mountain Bike is best for trails.");
 
