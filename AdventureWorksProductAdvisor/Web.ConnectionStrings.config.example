@@ -1,0 +1,3 @@
+<connectionStrings>
+  <add name="AdventureWorksLT" connectionString="Server=tcp:YOUR_SERVER.database.windows.net,1433;Database=YOUR_DATABASE;User ID=YOUR_USER;Password=YOUR_PASSWORD;Encrypt=True;TrustServerCertificate=False;Connection Timeout=30;" providerName="System.Data.SqlClient" />
+</connectionStrings>

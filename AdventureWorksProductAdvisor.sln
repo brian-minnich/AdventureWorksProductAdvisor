@@ -1,0 +1,28 @@
+
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 18
+VisualStudioVersion = 18.0.12120.119
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AdventureWorksProductAdvisor", "AdventureWorksProductAdvisor\AdventureWorksProductAdvisor.csproj", "{871B6C2E-B0E7-4976-9C7A-BF7BF787F632}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AdventureWorksProductAdvisor.Tests", "AdventureWorksProductAdvisor.Tests\AdventureWorksProductAdvisor.Tests.csproj", "{40314175-8203-49C0-88D0-AD7F1BAF02D0}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{871B6C2E-B0E7-4976-9C7A-BF7BF787F632}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{871B6C2E-B0E7-4976-9C7A-BF7BF787F632}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{871B6C2E-B0E7-4976-9C7A-BF7BF787F632}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{871B6C2E-B0E7-4976-9C7A-BF7BF787F632}.Release|Any CPU.Build.0 = Release|Any CPU
+		{40314175-8203-49C0-88D0-AD7F1BAF02D0}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{40314175-8203-49C0-88D0-AD7F1BAF02D0}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{40314175-8203-49C0-88D0-AD7F1BAF02D0}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{40314175-8203-49C0-88D0-AD7F1BAF02D0}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal
