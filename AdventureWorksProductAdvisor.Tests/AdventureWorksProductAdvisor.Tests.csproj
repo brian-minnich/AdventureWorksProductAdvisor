@@ -51,6 +51,8 @@
     <Compile Include="Services\AzureOpenAiChatCompletionServiceTests.cs" />
     <Compile Include="Services\SimilarityRankerTests.cs" />
     <Compile Include="Services\CSharpAskServiceTests.cs" />
+    <Compile Include="Services\ReviewEmbeddingBackfillRunnerTests.cs" />
+    <Compile Include="Controllers\Api\AdminControllerTests.cs" />
     <Compile Include="Controllers\Api\AskControllerTests.cs" />
   </ItemGroup>
   <ItemGroup>
