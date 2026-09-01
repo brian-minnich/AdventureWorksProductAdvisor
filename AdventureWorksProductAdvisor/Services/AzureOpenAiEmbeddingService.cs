@@ -40,12 +40,14 @@ namespace AdventureWorksProductAdvisor.Services
                 request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token.Token);
                 request.Content = new StringContent(requestJson, Encoding.UTF8, "application/json");
 
-                var response = await _httpClient.SendAsync(request);
-                response.EnsureSuccessStatusCode();
+                using (var response = await _httpClient.SendAsync(request))
+                {
+                    response.EnsureSuccessStatusCode();
 
-                var responseJson = await response.Content.ReadAsStringAsync();
-                var parsed = JObject.Parse(responseJson);
-                return parsed["data"][0]["embedding"].ToObject<float[]>();
+                    var responseJson = await response.Content.ReadAsStringAsync();
+                    var parsed = JObject.Parse(responseJson);
+                    return parsed["data"][0]["embedding"].ToObject<float[]>();
+                }
             }
         }
     }

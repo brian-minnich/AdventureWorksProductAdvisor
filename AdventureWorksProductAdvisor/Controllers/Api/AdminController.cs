@@ -10,7 +10,7 @@ namespace AdventureWorksProductAdvisor.Controllers.Api
         private readonly ReviewEmbeddingBackfillRunner _runner;
 
         public AdminController()
-            : this(new ReviewEmbeddingBackfillRunner(AskServiceFactory.CreateReviewRepository(), AskServiceFactory.CreateEmbeddingService()))
+            : this(AskServiceFactory.CreateBackfillRunner())
         {
         }
 
