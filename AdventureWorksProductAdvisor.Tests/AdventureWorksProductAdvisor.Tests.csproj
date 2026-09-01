@@ -45,6 +45,9 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="TestHelpers\FakeHttpMessageHandler.cs" />
+    <Compile Include="TestHelpers\FakeTokenCredential.cs" />
+    <Compile Include="Services\AzureOpenAiEmbeddingServiceTests.cs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\AdventureWorksProductAdvisor\AdventureWorksProductAdvisor.csproj">
