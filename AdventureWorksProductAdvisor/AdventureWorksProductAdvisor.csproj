@@ -74,6 +74,9 @@
     <Compile Include="Services\IChatCompletionService.cs" />
     <Compile Include="Services\AzureOpenAiChatCompletionService.cs" />
     <Compile Include="Services\SimilarityRanker.cs" />
+    <Compile Include="Services\AskResult.cs" />
+    <Compile Include="Services\IAskService.cs" />
+    <Compile Include="Services\CSharpAskService.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
