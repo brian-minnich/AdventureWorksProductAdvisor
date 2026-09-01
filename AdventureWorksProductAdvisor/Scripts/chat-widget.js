@@ -22,7 +22,10 @@
             bubble.style.borderColor = "#a94442";
             bubble.style.color = "#a94442";
         }
-        bubble.innerHTML = "<strong>[" + mode + "]</strong> " + text;
+        var label = document.createElement("strong");
+        label.textContent = "[" + mode + "]";
+        bubble.appendChild(label);
+        bubble.appendChild(document.createTextNode(" " + text));
         history.appendChild(bubble);
     }
 
