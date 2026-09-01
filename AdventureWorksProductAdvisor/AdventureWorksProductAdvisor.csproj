@@ -66,6 +66,9 @@
     <Compile Include="App_Start\WebApiConfig.cs" />
     <Compile Include="App_Start\FilterConfig.cs" />
     <Compile Include="Controllers\HomeController.cs" />
+    <Compile Include="Data\ReviewRecord.cs" />
+    <Compile Include="Data\IReviewRepository.cs" />
+    <Compile Include="Data\ReviewRepository.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
