@@ -49,6 +49,7 @@
     <Compile Include="TestHelpers\FakeTokenCredential.cs" />
     <Compile Include="Services\AzureOpenAiEmbeddingServiceTests.cs" />
     <Compile Include="Services\AzureOpenAiChatCompletionServiceTests.cs" />
+    <Compile Include="Services\SimilarityRankerTests.cs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\AdventureWorksProductAdvisor\AdventureWorksProductAdvisor.csproj">

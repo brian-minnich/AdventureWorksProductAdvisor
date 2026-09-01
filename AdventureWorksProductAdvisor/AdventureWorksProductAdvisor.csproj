@@ -73,6 +73,7 @@
     <Compile Include="Services\AzureOpenAiEmbeddingService.cs" />
     <Compile Include="Services\IChatCompletionService.cs" />
     <Compile Include="Services\AzureOpenAiChatCompletionService.cs" />
+    <Compile Include="Services\SimilarityRanker.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
