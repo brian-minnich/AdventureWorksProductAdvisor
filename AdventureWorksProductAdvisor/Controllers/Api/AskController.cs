@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Configuration;
+using System.Diagnostics;
 using System.Threading.Tasks;
 using System.Web.Http;
 using AdventureWorksProductAdvisor.Models;
@@ -61,8 +62,9 @@ namespace AdventureWorksProductAdvisor.Controllers.Api
                     Mode = request.Mode
                 });
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+                Trace.TraceError(ex.ToString());
                 return Ok(new AskResponse
                 {
                     Success = false,
