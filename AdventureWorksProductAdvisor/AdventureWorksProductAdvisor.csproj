@@ -77,6 +77,10 @@
     <Compile Include="Services\AskResult.cs" />
     <Compile Include="Services\IAskService.cs" />
     <Compile Include="Services\CSharpAskService.cs" />
+    <Compile Include="Models\AskRequest.cs" />
+    <Compile Include="Models\AskResponse.cs" />
+    <Compile Include="Services\AskServiceFactory.cs" />
+    <Compile Include="Controllers\Api\AskController.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
