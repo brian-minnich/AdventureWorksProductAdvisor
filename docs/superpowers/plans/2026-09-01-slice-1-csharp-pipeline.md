@@ -705,7 +705,7 @@ Not unit tested per the design doc (thin ADO.NET wrapper — exercised for real 
           // Kept identical to dbo.AskProductQuestion's system message (sql/dbo.AskProductQuestion.sql)
           // so both pipelines answer under the same instructions for a fair comparison.
           private const string SystemPrompt =
-              "You are an AdventureWorks product assistant. Follow these rules:\n" +
+              "You are an Adventure Works product assistant. Follow these rules:\n" +
               "1. Answer only using the provided product reviews and data\n" +
               "2. Reference specific customer experiences from the reviews when relevant\n" +
               "3. Include star ratings to help the customer assess product quality\n" +
