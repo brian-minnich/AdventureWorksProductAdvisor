@@ -1,3 +1,4 @@
+using System.Linq;
 using System.Threading.Tasks;
 using AdventureWorksProductAdvisor.Data;
 
@@ -17,14 +18,14 @@ namespace AdventureWorksProductAdvisor.Services
         public async Task<int> RunAsync()
         {
             var reviews = await _reviewRepository.GetAllReviewsAsync();
-            var count = 0;
-            foreach (var review in reviews)
+            var reviewsToEmbed = reviews.Where(r => r.Embedding == null).ToList();
+            foreach (var review in reviewsToEmbed)
             {
-                var embedding = await _embeddingService.GetEmbeddingAsync(review.ReviewText);
+                var textToEmbed = $"{review.ProductName}. {review.ReviewTitle}. {review.ReviewText}";
+                var embedding = await _embeddingService.GetEmbeddingAsync(textToEmbed);
                 await _reviewRepository.SaveEmbeddingAsync(review.ReviewId, embedding);
-                count++;
             }
-            return count;
+            return reviewsToEmbed.Count;
         }
     }
 }

@@ -16,16 +16,16 @@ namespace AdventureWorksProductAdvisor.Tests.Services
         {
             var reviews = new List<ReviewRecord>
             {
-                new ReviewRecord { ReviewId = 1, ReviewText = "Loved it" },
-                new ReviewRecord { ReviewId = 2, ReviewText = "It was okay" }
+                new ReviewRecord { ReviewId = 1, ProductName = "Mountain Bike", ReviewTitle = "Great", ReviewText = "Loved it" },
+                new ReviewRecord { ReviewId = 2, ProductName = "Road Bike", ReviewTitle = "Meh", ReviewText = "It was okay" }
             };
 
             var reviewRepository = new Mock<IReviewRepository>();
             reviewRepository.Setup(r => r.GetAllReviewsAsync()).ReturnsAsync(reviews);
 
             var embeddingService = new Mock<IEmbeddingService>();
-            embeddingService.Setup(e => e.GetEmbeddingAsync("Loved it")).ReturnsAsync(new float[] { 0.5f });
-            embeddingService.Setup(e => e.GetEmbeddingAsync("It was okay")).ReturnsAsync(new float[] { 0.25f });
+            embeddingService.Setup(e => e.GetEmbeddingAsync("Mountain Bike. Great. Loved it")).ReturnsAsync(new float[] { 0.5f });
+            embeddingService.Setup(e => e.GetEmbeddingAsync("Road Bike. Meh. It was okay")).ReturnsAsync(new float[] { 0.25f });
 
             var runner = new ReviewEmbeddingBackfillRunner(reviewRepository.Object, embeddingService.Object);
 
