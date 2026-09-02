@@ -1,16 +1,15 @@
+using System;
 using System.Net.Http;
-using System.Net.Http.Headers;
-using System.Text;
-using System.Threading;
-using System.Threading.Tasks;
 using Azure.Core;
 using Newtonsoft.Json.Linq;
+using System.Threading.Tasks;
 
 namespace AdventureWorksProductAdvisor.Services
 {
     // Same shape as AzureOpenAiEmbeddingService (same auth pattern, same
-    // dependency-injected HttpClient/TokenCredential for testability), but
-    // calls the chat completions endpoint instead of embeddings, and sends a
+    // dependency-injected HttpClient/TokenCredential for testability, same
+    // shared AzureOpenAiRequestSender for the actual HTTP call), but calls
+    // the chat completions endpoint instead of embeddings, and sends a
     // "messages" array (system instructions + the user's actual prompt)
     // rather than a single string.
     public class AzureOpenAiChatCompletionService : IChatCompletionService
@@ -50,10 +49,6 @@ namespace AdventureWorksProductAdvisor.Services
         // OpenAI expects and unwrapping its response.
         public async Task<string> GetCompletionAsync(string prompt, int maxCompletionTokens)
         {
-            var token = await _credential.GetTokenAsync(
-                new TokenRequestContext(new[] { "https://cognitiveservices.azure.com/.default" }),
-                CancellationToken.None);
-
             var url = $"{_endpoint}/openai/deployments/{_deploymentName}/chat/completions?api-version={_apiVersion}";
 
             // Chat completions expect a list of messages with roles, not a
@@ -75,22 +70,19 @@ namespace AdventureWorksProductAdvisor.Services
                 ["temperature"] = 0.5
             };
 
-            using (var request = new HttpRequestMessage(HttpMethod.Post, url))
+            var parsed = await AzureOpenAiRequestSender.SendAsync(_httpClient, _credential, url, payload);
+
+            // Azure's chat completions response nests the actual answer text
+            // at choices[0].message.content - but "choices" can legitimately
+            // come back empty (e.g. a content-filtered completion) even on a
+            // 200 OK, so this is checked explicitly rather than indexing
+            // straight into an array that might not have an element 0.
+            var choices = parsed["choices"] as JArray;
+            if (choices == null || choices.Count == 0)
             {
-                request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token.Token);
-                request.Content = new StringContent(payload.ToString(), Encoding.UTF8, "application/json");
-
-                using (var response = await _httpClient.SendAsync(request))
-                {
-                    response.EnsureSuccessStatusCode();
-
-                    var responseJson = await response.Content.ReadAsStringAsync();
-                    var parsed = JObject.Parse(responseJson);
-                    // Azure's chat completions response nests the actual
-                    // answer text at choices[0].message.content.
-                    return parsed["choices"][0]["message"]["content"].ToString();
-                }
+                throw new InvalidOperationException("Azure OpenAI returned no choices in the chat completion response.");
             }
+            return choices[0]["message"]["content"].ToString();
         }
     }
 }

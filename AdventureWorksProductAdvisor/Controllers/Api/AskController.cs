@@ -30,8 +30,19 @@ namespace AdventureWorksProductAdvisor.Controllers.Api
         // the real pipelines (real HTTP calls, real database) via
         // AskServiceFactory, and reads the token cap from Web.config.
         public AskController()
-            : this(AskServiceFactory.CreatePipelines(), int.Parse(ConfigurationManager.AppSettings["MaxCompletionTokens"]))
+            : this(AskServiceFactory.CreatePipelines(), GetMaxCompletionTokensFromConfig())
         {
+        }
+
+        // Falls back to the documented default (500) if the config key is
+        // missing or gets mistyped during a config edit, rather than
+        // crashing every single controller construction - since ASP.NET
+        // builds a new AskController per request, an unguarded int.Parse
+        // here would take down all of /api/ask on a bad config value.
+        private static int GetMaxCompletionTokensFromConfig()
+        {
+            int value;
+            return int.TryParse(ConfigurationManager.AppSettings["MaxCompletionTokens"], out value) ? value : 500;
         }
 
         // This second constructor is the "seam" that makes the controller

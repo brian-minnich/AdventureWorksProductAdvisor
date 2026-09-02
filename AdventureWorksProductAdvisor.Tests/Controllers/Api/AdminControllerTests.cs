@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Net.Http;
 using System.Threading.Tasks;
@@ -41,6 +42,30 @@ namespace AdventureWorksProductAdvisor.Tests.Controllers.Api
             var okResult = result as OkNegotiatedContentResult<int>;
             Assert.IsNotNull(okResult);
             Assert.AreEqual(1, okResult.Content);
+        }
+
+        [TestMethod]
+        public async Task BackfillEmbeddings_RunnerThrows_ReturnsInternalServerErrorWithoutExceptionDetails()
+        {
+            // Simulates a failure partway through the backfill (e.g. Azure
+            // OpenAI returning an error) - the controller must not let this
+            // propagate as a raw unhandled exception to an unauthenticated caller.
+            var reviewRepository = new Mock<IReviewRepository>();
+            reviewRepository.Setup(r => r.GetAllReviewsAsync()).ThrowsAsync(new InvalidOperationException("boom"));
+
+            var embeddingService = new Mock<IEmbeddingService>();
+
+            var runner = new ReviewEmbeddingBackfillRunner(reviewRepository.Object, embeddingService.Object);
+            var controller = new AdminController(runner);
+            controller.Configuration = new HttpConfiguration();
+            controller.Request = new HttpRequestMessage();
+
+            var result = await controller.BackfillEmbeddings();
+
+            // InternalServerErrorResult carries no message/content of its
+            // own (unlike InternalServerError(ex)), which is the point:
+            // nothing about the real exception reaches the HTTP response.
+            Assert.IsInstanceOfType(result, typeof(InternalServerErrorResult));
         }
     }
 }

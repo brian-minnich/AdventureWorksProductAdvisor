@@ -49,10 +49,14 @@ namespace AdventureWorksProductAdvisor.Data
                         {
                             ReviewId = (int)reader["ReviewID"],
                             ProductId = (int)reader["ProductID"],
-                            ProductName = (string)reader["ProductName"],
-                            Rating = (byte)reader["Rating"],
-                            ReviewTitle = (string)reader["ReviewTitle"],
-                            ReviewText = (string)reader["ReviewText"],
+                            // `as string`/`as byte?` return null for DBNull.Value
+                            // instead of throwing InvalidCastException, so one
+                            // row with an unexpectedly null column doesn't take
+                            // down the whole read.
+                            ProductName = reader["ProductName"] as string,
+                            Rating = (reader["Rating"] as byte?) ?? 0,
+                            ReviewTitle = reader["ReviewTitle"] as string,
+                            ReviewText = reader["ReviewText"] as string,
                             // The embedding is stored as a JSON array of
                             // numbers in a text column (ReviewEmbeddingJson),
                             // not a native vector type - JsonConvert turns

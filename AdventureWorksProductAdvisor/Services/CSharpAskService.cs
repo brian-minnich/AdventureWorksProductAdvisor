@@ -35,14 +35,16 @@ namespace AdventureWorksProductAdvisor.Services
 
         public async Task<AskServiceResult> AskAsync(string question, int maxCompletionTokens, int topN)
         {
-            // Step 1: turn the question into the same kind of vector the
-            // reviews were embedded into (see ReviewEmbeddingBackfillRunner),
-            // so they can be compared.
-            var queryEmbedding = await _embeddingService.GetEmbeddingAsync(question);
-
-            // Step 2: load every review (each one already carries its own
-            // pre-computed embedding, read from the ReviewEmbeddingJson column).
-            var allReviews = await _reviewRepository.GetAllReviewsAsync();
+            // Steps 1 and 2 don't depend on each other's result (embedding the
+            // question and loading the reviews from the database are
+            // independent), so they run concurrently via Task.WhenAll instead
+            // of one after another - this call takes roughly as long as the
+            // slower of the two, not the sum of both.
+            var embeddingTask = _embeddingService.GetEmbeddingAsync(question);
+            var reviewsTask = _reviewRepository.GetAllReviewsAsync();
+            await Task.WhenAll(embeddingTask, reviewsTask);
+            var queryEmbedding = embeddingTask.Result;
+            var allReviews = reviewsTask.Result;
 
             // Step 3: pick the topN reviews whose embeddings are closest to
             // the question's embedding.

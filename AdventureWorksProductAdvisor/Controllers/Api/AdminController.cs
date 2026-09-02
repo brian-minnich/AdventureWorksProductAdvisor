@@ -1,3 +1,5 @@
+using System;
+using System.Diagnostics;
 using System.Threading.Tasks;
 using System.Web.Http;
 using AdventureWorksProductAdvisor.Services;
@@ -33,8 +35,20 @@ namespace AdventureWorksProductAdvisor.Controllers.Api
         [Route("backfill-embeddings")]
         public async Task<IHttpActionResult> BackfillEmbeddings()
         {
-            var count = await _runner.RunAsync();
-            return Ok(count);
+            try
+            {
+                var count = await _runner.RunAsync();
+                return Ok(count);
+            }
+            catch (Exception ex)
+            {
+                // Same pattern as AskController: log the real exception
+                // server-side, but never let exception details (a SQL
+                // connection string, an Azure OpenAI error body, etc.) reach
+                // the HTTP caller of this unauthenticated endpoint.
+                Trace.TraceError(ex.ToString());
+                return InternalServerError();
+            }
         }
     }
 }
