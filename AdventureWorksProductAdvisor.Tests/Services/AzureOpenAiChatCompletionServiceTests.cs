@@ -9,12 +9,16 @@ using Newtonsoft.Json.Linq;
 
 namespace AdventureWorksProductAdvisor.Tests.Services
 {
+    // Same fake-HttpClient/fake-credential approach as
+    // AzureOpenAiEmbeddingServiceTests - see that file's comments for the
+    // full explanation of how FakeHttpMessageHandler/FakeTokenCredential work.
     [TestClass]
     public class AzureOpenAiChatCompletionServiceTests
     {
         [TestMethod]
         public async Task GetCompletionAsync_SendsSystemAndUserMessages_ReturnsParsedContent()
         {
+            // A fake chat-completions response in Azure's actual shape.
             var canned = "{\"choices\":[{\"message\":{\"content\":\"Test answer\"}}]}";
             var handler = new FakeHttpMessageHandler(request => new HttpResponseMessage(HttpStatusCode.OK)
             {
@@ -35,6 +39,12 @@ namespace AdventureWorksProductAdvisor.Tests.Services
             Assert.AreEqual("Bearer", handler.LastRequest.Headers.Authorization.Scheme);
             Assert.AreEqual("test-token", handler.LastRequest.Headers.Authorization.Parameter);
 
+            // Beyond checking the response was parsed correctly, this also
+            // inspects the actual JSON body that was sent (captured by
+            // FakeHttpMessageHandler as LastRequestBody) - confirming the
+            // "messages" array really does have a system message first and
+            // the user's prompt second, and that max_completion_tokens made
+            // it into the payload rather than being silently dropped.
             var sentPayload = JObject.Parse(handler.LastRequestBody);
             var messages = (JArray)sentPayload["messages"];
             Assert.AreEqual(2, messages.Count);

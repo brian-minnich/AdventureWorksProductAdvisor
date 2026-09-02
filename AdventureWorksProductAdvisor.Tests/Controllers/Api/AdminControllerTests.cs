@@ -24,6 +24,13 @@ namespace AdventureWorksProductAdvisor.Tests.Controllers.Api
             var embeddingService = new Mock<IEmbeddingService>();
             embeddingService.Setup(e => e.GetEmbeddingAsync(It.IsAny<string>())).ReturnsAsync(new float[] { 0.5f });
 
+            // Rather than mocking ReviewEmbeddingBackfillRunner directly
+            // (it's a concrete class, not an interface), this builds a real
+            // one from mocked IReviewRepository/IEmbeddingService - so the
+            // runner's own logic (already covered by
+            // ReviewEmbeddingBackfillRunnerTests) also runs for real here.
+            // This test's actual focus is just: does the controller call
+            // RunAsync and return its count correctly?
             var runner = new ReviewEmbeddingBackfillRunner(reviewRepository.Object, embeddingService.Object);
             var controller = new AdminController(runner);
             controller.Configuration = new HttpConfiguration();

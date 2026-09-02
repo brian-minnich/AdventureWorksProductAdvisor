@@ -8,10 +8,18 @@ using Newtonsoft.Json.Linq;
 
 namespace AdventureWorksProductAdvisor.Services
 {
+    // Same shape as AzureOpenAiEmbeddingService (same auth pattern, same
+    // dependency-injected HttpClient/TokenCredential for testability), but
+    // calls the chat completions endpoint instead of embeddings, and sends a
+    // "messages" array (system instructions + the user's actual prompt)
+    // rather than a single string.
     public class AzureOpenAiChatCompletionService : IChatCompletionService
     {
         // Kept identical to dbo.AskProductQuestion's system message (sql/dbo.AskProductQuestion.sql)
         // so both pipelines answer under the same instructions for a fair comparison.
+        // If this ever needs to change, the SQL stored procedure's system
+        // message must be updated to match, word for word, or the two
+        // pipelines are no longer a fair comparison.
         private const string SystemPrompt =
             "You are an Adventure Works product assistant. Follow these rules:\n" +
             "1. Answer only using the provided product reviews and data\n" +
@@ -36,6 +44,10 @@ namespace AdventureWorksProductAdvisor.Services
             _apiVersion = apiVersion;
         }
 
+        // "prompt" here is the augmented prompt CSharpAskService.BuildPrompt
+        // constructed - the retrieved reviews plus the customer's question.
+        // This method's only job is wrapping that in the request shape Azure
+        // OpenAI expects and unwrapping its response.
         public async Task<string> GetCompletionAsync(string prompt, int maxCompletionTokens)
         {
             var token = await _credential.GetTokenAsync(
@@ -44,6 +56,9 @@ namespace AdventureWorksProductAdvisor.Services
 
             var url = $"{_endpoint}/openai/deployments/{_deploymentName}/chat/completions?api-version={_apiVersion}";
 
+            // Chat completions expect a list of messages with roles, not a
+            // single string: "system" sets the model's behavior/instructions,
+            // "user" is the actual question+context being asked about.
             var payload = new JObject
             {
                 ["messages"] = new JArray
@@ -51,7 +66,12 @@ namespace AdventureWorksProductAdvisor.Services
                     new JObject { ["role"] = "system", ["content"] = SystemPrompt },
                     new JObject { ["role"] = "user", ["content"] = prompt }
                 },
+                // max_completion_tokens caps how much the model can generate -
+                // this is the actual cost guard; the value comes all the way
+                // from Web.config via AskController, never from the client.
                 ["max_completion_tokens"] = maxCompletionTokens,
+                // Lower temperature = more focused/deterministic answers,
+                // matching the stored procedure's setting for a fair comparison.
                 ["temperature"] = 0.5
             };
 
@@ -66,6 +86,8 @@ namespace AdventureWorksProductAdvisor.Services
 
                     var responseJson = await response.Content.ReadAsStringAsync();
                     var parsed = JObject.Parse(responseJson);
+                    // Azure's chat completions response nests the actual
+                    // answer text at choices[0].message.content.
                     return parsed["choices"][0]["message"]["content"].ToString();
                 }
             }

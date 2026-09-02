@@ -6,12 +6,19 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace AdventureWorksProductAdvisor.Tests.Services
 {
+    // No mocks anywhere in this file - SimilarityRanker has no external
+    // dependencies (no network, no database), so these tests just hand it
+    // plain float arrays and check what comes back.
     [TestClass]
     public class SimilarityRankerTests
     {
         [TestMethod]
         public void GetTopN_OrdersByDescendingCosineSimilarity()
         {
+            // Query points straight along the first axis. Review 2's
+            // embedding is identical to the query (most similar), review 3
+            // is at a 45-degree angle (partially similar), review 1 is
+            // perpendicular (least similar) - so the expected order is 2, 3, 1.
             var query = new float[] { 1f, 0f };
             var reviews = new List<ReviewRecord>
             {
@@ -29,6 +36,8 @@ namespace AdventureWorksProductAdvisor.Tests.Services
         [TestMethod]
         public void GetTopN_LimitsToRequestedCount()
         {
+            // All three reviews are similar to the query, but only the top 2
+            // (by similarity, not by list order) should be returned.
             var query = new float[] { 1f, 0f };
             var reviews = new List<ReviewRecord>
             {
@@ -47,6 +56,8 @@ namespace AdventureWorksProductAdvisor.Tests.Services
         [TestMethod]
         public void GetTopN_IgnoresReviewsWithoutEmbeddings()
         {
+            // Review 1 has never been through the backfill (Embedding is
+            // null) - it should be silently excluded, not throw.
             var query = new float[] { 1f, 0f };
             var reviews = new List<ReviewRecord>
             {
@@ -63,6 +74,13 @@ namespace AdventureWorksProductAdvisor.Tests.Services
         [TestMethod]
         public void GetTopN_IgnoresReviewsWithMismatchedEmbeddingLength()
         {
+            // Review 2's embedding has 3 numbers, but the query only has 2 -
+            // this would be meaningless to compare, so it should be
+            // excluded the same way a null embedding is. This scenario
+            // matters most if the embedding model/deployment is ever
+            // changed to one that produces a different-sized vector: without
+            // this filter, comparing old and new embeddings together would
+            // produce nonsense results instead of a clear error.
             var query = new float[] { 1f, 0f };
             var reviews = new List<ReviewRecord>
             {
