@@ -1,0 +1,19 @@
+@* Bare-bones layout - no Bootstrap/jQuery, since this app has exactly one
+   real page and doesn't need a CSS/JS framework for it. *@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <title>@ViewBag.Title - AdventureWorks Product Advisor</title>
+</head>
+<body>
+    <div>
+        @* Renders whatever the specific view (e.g. Index.cshtml) contains. *@
+        @RenderBody()
+    </div>
+    @* Lets a view inject its own <script> tags after the body - Index.cshtml
+       uses this to load chat-widget.js. required: false means views that
+       don't define a "scripts" section (there aren't any others) won't error. *@
+    @RenderSection("scripts", required: false)
+</body>
+</html>
