@@ -25,7 +25,16 @@ namespace AdventureWorksProductAdvisor.Services
         // created once, the first time this class is touched, and reused for
         // the lifetime of the application.
         private static readonly HttpClient SharedHttpClient = new HttpClient();
-        private static readonly TokenCredential SharedCredential = new DefaultAzureCredential();
+
+        // TenantId is required here because the signed-in account
+        // (bjminnich@comcast.net) is a B2B guest in the Azure AD tenant that
+        // owns this subscription, not a native member - without an explicit
+        // TenantId, DefaultAzureCredential can't infer which directory to
+        // request a token from and silently resolves to the wrong one,
+        // producing a token Azure OpenAI rejects with 401 even though the
+        // "Cognitive Services OpenAI User" role assignment is correct.
+        private static readonly TokenCredential SharedCredential = new DefaultAzureCredential(
+            new DefaultAzureCredentialOptions { TenantId = ConfigurationManager.AppSettings["AzureAdTenantId"] });
 
         public static IReviewRepository CreateReviewRepository()
         {
