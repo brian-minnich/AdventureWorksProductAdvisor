@@ -80,6 +80,9 @@
     <Compile Include="Services\CSharpAskService.cs" />
     <Compile Include="Models\AskRequest.cs" />
     <Compile Include="Models\AskResponse.cs" />
+    <Compile Include="Models\CallLogEntry.cs" />
+    <Compile Include="Services\ICallLogService.cs" />
+    <Compile Include="Services\CallLogService.cs" />
     <Compile Include="Services\AskServiceFactory.cs" />
     <Compile Include="Services\ReviewEmbeddingBackfillRunner.cs" />
     <Compile Include="Controllers\Api\AdminController.cs" />
