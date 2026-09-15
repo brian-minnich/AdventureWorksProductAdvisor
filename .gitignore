@@ -4,3 +4,4 @@ obj/
 *.user
 packages/
 AdventureWorksProductAdvisor/Web.ConnectionStrings.config
+AdventureWorksProductAdvisor/Web.AppSettings.config
