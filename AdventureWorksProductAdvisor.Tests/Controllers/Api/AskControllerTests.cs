@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Net.Http;
 using System.Threading.Tasks;
@@ -81,13 +82,138 @@ namespace AdventureWorksProductAdvisor.Tests.Controllers.Api
             askService.Verify(s => s.AskAsync(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<int>()), Times.Never);
         }
 
+        [TestMethod]
+        public async Task Post_DailyLimitReached_ReturnsFriendlyErrorWithoutInvokingPipelineOrLogging()
+        {
+            var askService = new Mock<IAskService>();
+            var pipelines = new Dictionary<string, IAskService> { ["CSharp"] = askService.Object };
+            var callLogService = new Mock<ICallLogService>();
+            callLogService.Setup(s => s.GetTodaysCallCountAsync()).ReturnsAsync(5);
+            var controller = CreateController(pipelines, callLogService.Object, dailyCallLimit: 5);
+
+            var result = await controller.Post(new AskRequest { Question = "Anything?", Mode = "CSharp", TopN = 5 });
+
+            var okResult = result as OkNegotiatedContentResult<AskResponse>;
+            Assert.IsNotNull(okResult);
+            Assert.IsFalse(okResult.Content.Success);
+            StringAssert.Contains(okResult.Content.ErrorMessage, "Daily call limit reached");
+            askService.Verify(s => s.AskAsync(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<int>()), Times.Never);
+            callLogService.Verify(s => s.LogCallAsync(It.IsAny<CallLogEntry>()), Times.Never);
+        }
+
+        [TestMethod]
+        public async Task Post_UnderDailyLimit_LogsSuccessfulCall()
+        {
+            var askService = new Mock<IAskService>();
+            askService.Setup(s => s.AskAsync("What is the best product?", 500, 5))
+                .ReturnsAsync(new AskServiceResult { Success = true, Answer = "It's great." });
+            var pipelines = new Dictionary<string, IAskService> { ["CSharp"] = askService.Object };
+            var callLogService = new Mock<ICallLogService>();
+            callLogService.Setup(s => s.GetTodaysCallCountAsync()).ReturnsAsync(0);
+            CallLogEntry loggedEntry = null;
+            callLogService.Setup(s => s.LogCallAsync(It.IsAny<CallLogEntry>()))
+                .Callback<CallLogEntry>(e => loggedEntry = e)
+                .Returns(Task.CompletedTask);
+            var controller = CreateController(pipelines, callLogService.Object);
+
+            var result = await controller.Post(new AskRequest { Question = "What is the best product?", Mode = "CSharp", TopN = 5 });
+
+            var okResult = result as OkNegotiatedContentResult<AskResponse>;
+            Assert.IsTrue(okResult.Content.Success);
+            Assert.IsNotNull(loggedEntry);
+            Assert.AreEqual("CSharp", loggedEntry.Mode);
+            Assert.AreEqual("What is the best product?", loggedEntry.Question);
+            Assert.AreEqual(500, loggedEntry.MaxCompletionTokens);
+            Assert.IsTrue(loggedEntry.Success);
+            Assert.IsNull(loggedEntry.ErrorMessage);
+        }
+
+        [TestMethod]
+        public async Task Post_PipelineThrows_LogsFailureAndReturnsGenericError()
+        {
+            var askService = new Mock<IAskService>();
+            askService.Setup(s => s.AskAsync(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<int>()))
+                .ThrowsAsync(new InvalidOperationException("SQL timeout"));
+            var pipelines = new Dictionary<string, IAskService> { ["CSharp"] = askService.Object };
+            var callLogService = new Mock<ICallLogService>();
+            callLogService.Setup(s => s.GetTodaysCallCountAsync()).ReturnsAsync(0);
+            CallLogEntry loggedEntry = null;
+            callLogService.Setup(s => s.LogCallAsync(It.IsAny<CallLogEntry>()))
+                .Callback<CallLogEntry>(e => loggedEntry = e)
+                .Returns(Task.CompletedTask);
+            var controller = CreateController(pipelines, callLogService.Object);
+
+            var result = await controller.Post(new AskRequest { Question = "Anything?", Mode = "CSharp", TopN = 5 });
+
+            var okResult = result as OkNegotiatedContentResult<AskResponse>;
+            Assert.IsFalse(okResult.Content.Success);
+            StringAssert.Contains(okResult.Content.ErrorMessage, "An error occurred");
+            Assert.IsNotNull(loggedEntry);
+            Assert.IsFalse(loggedEntry.Success);
+            Assert.AreEqual("SQL timeout", loggedEntry.ErrorMessage);
+        }
+
+        [TestMethod]
+        public async Task Post_LogCallAsyncThrows_StillReturnsRealAnswer()
+        {
+            var askService = new Mock<IAskService>();
+            askService.Setup(s => s.AskAsync(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<int>()))
+                .ReturnsAsync(new AskServiceResult { Success = true, Answer = "It's great." });
+            var pipelines = new Dictionary<string, IAskService> { ["CSharp"] = askService.Object };
+            var callLogService = new Mock<ICallLogService>();
+            callLogService.Setup(s => s.GetTodaysCallCountAsync()).ReturnsAsync(0);
+            callLogService.Setup(s => s.LogCallAsync(It.IsAny<CallLogEntry>()))
+                .ThrowsAsync(new InvalidOperationException("log write failed"));
+            var controller = CreateController(pipelines, callLogService.Object);
+
+            var result = await controller.Post(new AskRequest { Question = "Anything?", Mode = "CSharp", TopN = 5 });
+
+            var okResult = result as OkNegotiatedContentResult<AskResponse>;
+            Assert.IsNotNull(okResult);
+            Assert.IsTrue(okResult.Content.Success);
+            Assert.AreEqual("It's great.", okResult.Content.Answer);
+        }
+
+        [TestMethod]
+        public async Task Post_CallCountCheckThrows_FailsOpenAndInvokesPipeline()
+        {
+            var askService = new Mock<IAskService>();
+            askService.Setup(s => s.AskAsync(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<int>()))
+                .ReturnsAsync(new AskServiceResult { Success = true, Answer = "It's great." });
+            var pipelines = new Dictionary<string, IAskService> { ["CSharp"] = askService.Object };
+            var callLogService = new Mock<ICallLogService>();
+            callLogService.Setup(s => s.GetTodaysCallCountAsync()).ThrowsAsync(new InvalidOperationException("CallLog unreachable"));
+            callLogService.Setup(s => s.LogCallAsync(It.IsAny<CallLogEntry>())).Returns(Task.CompletedTask);
+            var controller = CreateController(pipelines, callLogService.Object);
+
+            var result = await controller.Post(new AskRequest { Question = "Anything?", Mode = "CSharp", TopN = 5 });
+
+            var okResult = result as OkNegotiatedContentResult<AskResponse>;
+            Assert.IsTrue(okResult.Content.Success);
+            askService.Verify(s => s.AskAsync(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<int>()), Times.Once);
+        }
+
         // Building an ApiController for a unit test needs a bit of manual
         // setup - Configuration/Request aren't populated automatically
         // outside of a real HTTP pipeline, and calling Ok(...) inside the
-        // controller throws without them.
-        private static AskController CreateController(IReadOnlyDictionary<string, IAskService> pipelines)
+        // controller throws without them. callLogService defaults to a mock
+        // that reports 0 calls today and accepts any LogCallAsync call, so
+        // existing tests that don't care about logging/the cap keep working
+        // unchanged.
+        private static AskController CreateController(
+            IReadOnlyDictionary<string, IAskService> pipelines,
+            ICallLogService callLogService = null,
+            int dailyCallLimit = 200)
         {
-            var controller = new AskController(pipelines, 500);
+            if (callLogService == null)
+            {
+                var defaultMock = new Mock<ICallLogService>();
+                defaultMock.Setup(s => s.GetTodaysCallCountAsync()).ReturnsAsync(0);
+                defaultMock.Setup(s => s.LogCallAsync(It.IsAny<CallLogEntry>())).Returns(Task.CompletedTask);
+                callLogService = defaultMock.Object;
+            }
+
+            var controller = new AskController(pipelines, 500, callLogService, dailyCallLimit);
             controller.Configuration = new HttpConfiguration();
             controller.Request = new HttpRequestMessage();
             return controller;
