@@ -42,6 +42,15 @@
 @* @RenderSection("scripts") in _Layout.cshtml is what pulls this in, placed
    after the page body so the DOM elements above already exist when the
    script runs. *@
+@* marked renders the model's markdown to HTML; DOMPurify sanitizes that
+   HTML before chat-widget.js puts it in the DOM, since the input is raw
+   LLM output. Both pinned to exact versions with SRI hashes. *@
 @section scripts {
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/18.0.13/lib/marked.umd.min.js"
+            integrity="sha512-kHavuYjOa82OKvUxD8j04s+kMIH84FmETnuIgj0yFyY9LWU10sXNwU54Iozpewat8VxAzH4aXiwTEZMRrpwfBw=="
+            crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.4.15/purify.min.js"
+            integrity="sha512-jeyPlk6E7VcWU2QTRw5UAe4iKLrWOJkyLc4GkOAOey1tOeTyxfTzrCY7p84VSer8/lRON5p236RGVeTErze9fA=="
+            crossorigin="anonymous" referrerpolicy="no-referrer"></script>
     <script src="~/Scripts/chat-widget.js"></script>
 }

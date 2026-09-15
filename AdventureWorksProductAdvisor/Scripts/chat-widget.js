@@ -18,12 +18,26 @@
         return "CSharp";
     }
 
-    // Adds one chat bubble to the page. Built with createElement/
-    // textContent/createTextNode rather than innerHTML + string
-    // concatenation, so that if `text` (which can be raw LLM output built
-    // from real review content) ever contains characters like < or &, they
-    // display as literal text instead of being interpreted as HTML.
+    // Removes whatever is currently shown in the history area. Called at
+    // the top of appendBubble so only the most recent question's bubble
+    // (loading placeholder, answer, or error) is ever on screen at once,
+    // rather than piling up one bubble per question asked this session.
+    function clearHistory() {
+        var history = document.getElementById("chatHistory");
+        while (history.firstChild) {
+            history.removeChild(history.firstChild);
+        }
+    }
+
+    // Replaces the history area with one chat bubble. Error text is a
+    // static app string (never LLM output), so it's still inserted as a
+    // plain text node. Success answers are raw LLM output formatted as
+    // markdown (the system prompt asks for **bold** and "- " bullets) -
+    // marked renders that to HTML and DOMPurify sanitizes it before it
+    // touches innerHTML, so characters like < or & in review content still
+    // can't be interpreted as live HTML/script.
     function appendBubble(mode, text, isError) {
+        clearHistory();
         var history = document.getElementById("chatHistory");
         var bubble = document.createElement("div");
         bubble.style.border = "1px solid #ccc";
@@ -37,7 +51,15 @@
         var label = document.createElement("strong");
         label.textContent = "[" + mode + "]";
         bubble.appendChild(label);
-        bubble.appendChild(document.createTextNode(" " + text));
+
+        if (isError) {
+            bubble.appendChild(document.createTextNode(" " + text));
+        } else {
+            var body = document.createElement("div");
+            body.innerHTML = DOMPurify.sanitize(marked.parse(text));
+            bubble.appendChild(body);
+        }
+
         history.appendChild(bubble);
     }
 
@@ -54,6 +76,11 @@
 
         var askButton = document.getElementById("askButton");
         askButton.disabled = true;
+
+        // Replace whatever's currently shown with a placeholder right away,
+        // rather than leaving the previous answer up during the several
+        // seconds the LLM call can take.
+        appendBubble(mode, "Thinking…", false);
 
         // The field names here (Question/Mode/TopN) must match AskRequest.cs
         // exactly - Web API's JSON formatter does not remap casing, so a
