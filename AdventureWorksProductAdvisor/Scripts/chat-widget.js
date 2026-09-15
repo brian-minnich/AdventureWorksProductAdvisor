@@ -18,15 +18,18 @@
         return "CSharp";
     }
 
-    // Removes whatever is currently shown in the history area. Called at
-    // the top of appendBubble so only the most recent question's bubble
-    // (loading placeholder, answer, or error) is ever on screen at once,
-    // rather than piling up one bubble per question asked this session.
+    // Removes whatever is currently shown in the history area and returns
+    // it, so appendBubble can reuse the same element instead of looking it
+    // up twice. Called at the top of appendBubble so only the most recent
+    // question's bubble (loading placeholder, answer, or error) is ever on
+    // screen at once, rather than piling up one bubble per question asked
+    // this session.
     function clearHistory() {
         var history = document.getElementById("chatHistory");
         while (history.firstChild) {
             history.removeChild(history.firstChild);
         }
+        return history;
     }
 
     // Replaces the history area with one chat bubble. Error text is a
@@ -37,8 +40,7 @@
     // touches innerHTML, so characters like < or & in review content still
     // can't be interpreted as live HTML/script.
     function appendBubble(mode, text, isError) {
-        clearHistory();
-        var history = document.getElementById("chatHistory");
+        var history = clearHistory();
         var bubble = document.createElement("div");
         bubble.style.border = "1px solid #ccc";
         bubble.style.borderRadius = "6px";
