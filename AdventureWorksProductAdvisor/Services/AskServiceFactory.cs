@@ -45,6 +45,12 @@ namespace AdventureWorksProductAdvisor.Services
             return new ReviewRepository(connectionString);
         }
 
+        public static ICallLogService CreateCallLogService()
+        {
+            var connectionString = ConfigurationManager.ConnectionStrings["AdventureWorksLT"].ConnectionString;
+            return new CallLogService(connectionString);
+        }
+
         public static IEmbeddingService CreateEmbeddingService()
         {
             // All the Azure-specific values (endpoint, which deployment,
@@ -82,12 +88,16 @@ namespace AdventureWorksProductAdvisor.Services
             var csharpAskService = new CSharpAskService(
                 CreateReviewRepository(), CreateEmbeddingService(), CreateChatCompletionService());
 
+            var connectionString = ConfigurationManager.ConnectionStrings["AdventureWorksLT"].ConnectionString;
+            var storedProcAskService = new StoredProcAskService(connectionString);
+
             // This dictionary is what AskController.Post looks a Mode up in.
-            // Adding a second pipeline later (e.g. "StoredProc") means adding
-            // one more entry here - AskController itself doesn't need to change.
+            // Adding a pipeline is just adding one more entry here -
+            // AskController itself doesn't need to change.
             return new Dictionary<string, IAskService>
             {
-                ["CSharp"] = csharpAskService
+                ["CSharp"] = csharpAskService,
+                ["StoredProc"] = storedProcAskService
             };
         }
     }
