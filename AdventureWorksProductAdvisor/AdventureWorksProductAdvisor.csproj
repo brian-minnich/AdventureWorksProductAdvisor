@@ -78,6 +78,7 @@
     <Compile Include="Services\AskResult.cs" />
     <Compile Include="Services\IAskService.cs" />
     <Compile Include="Services\CSharpAskService.cs" />
+    <Compile Include="Services\StoredProcAskService.cs" />
     <Compile Include="Models\AskRequest.cs" />
     <Compile Include="Models\AskResponse.cs" />
     <Compile Include="Models\CallLogEntry.cs" />
