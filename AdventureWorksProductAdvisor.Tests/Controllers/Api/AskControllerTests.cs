@@ -83,6 +83,26 @@ namespace AdventureWorksProductAdvisor.Tests.Controllers.Api
         }
 
         [TestMethod]
+        public async Task Post_QuestionTooLong_ReturnsValidationErrorWithoutInvokingPipeline()
+        {
+            var askService = new Mock<IAskService>();
+            var pipelines = new Dictionary<string, IAskService> { ["CSharp"] = askService.Object };
+            var controller = CreateController(pipelines);
+
+            // dbo.CallLog.Question is NVARCHAR(1000) - 1001 characters is
+            // one over the limit.
+            var tooLongQuestion = new string('a', 1001);
+            var result = await controller.Post(new AskRequest { Question = tooLongQuestion, Mode = "CSharp", TopN = 5 });
+
+            var okResult = result as OkNegotiatedContentResult<AskResponse>;
+            Assert.IsNotNull(okResult);
+            Assert.IsFalse(okResult.Content.Success);
+            StringAssert.Contains(okResult.Content.ErrorMessage, "1000 characters or fewer");
+            // Confirms the length check happens before any pipeline is ever touched.
+            askService.Verify(s => s.AskAsync(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<int>()), Times.Never);
+        }
+
+        [TestMethod]
         public async Task Post_DailyLimitReached_ReturnsFriendlyErrorWithoutInvokingPipelineOrLogging()
         {
             var askService = new Mock<IAskService>();

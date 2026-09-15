@@ -89,6 +89,19 @@ namespace AdventureWorksProductAdvisor.Controllers.Api
                 return Ok(new AskResponse { Success = false, ErrorMessage = "Question is required." });
             }
 
+            // dbo.CallLog.Question is NVARCHAR(1000) NOT NULL. Without this
+            // check, a too-long question sails past here, gets billed by the
+            // pipeline, and then silently fails to log (AddWithValue infers
+            // an oversized parameter, the INSERT truncation-fails, and that
+            // failure is swallowed in LogCallSafeAsync by design) - so it
+            // would never be audited and never count toward DailyCallLimit.
+            // Rejecting it here, before any pipeline runs, keeps the audit
+            // log and the daily cap trustworthy.
+            if (request.Question.Length > 1000)
+            {
+                return Ok(new AskResponse { Success = false, Mode = request.Mode, ErrorMessage = "Question must be 1000 characters or fewer." });
+            }
+
             // TopN is validated here on the server no matter what the UI
             // spinner's min/max say client-side, because a direct POST to
             // this endpoint (e.g. via curl) can send anything - the browser

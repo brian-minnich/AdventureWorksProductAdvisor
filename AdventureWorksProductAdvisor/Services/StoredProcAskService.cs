@@ -27,6 +27,11 @@ namespace AdventureWorksProductAdvisor.Services
             using (var command = new SqlCommand("dbo.AskProductQuestion", connection))
             {
                 command.CommandType = CommandType.StoredProcedure;
+                // 100 seconds, matching HttpClient's 100-second default used
+                // by the C# pipeline (AzureOpenAiChatCompletionService /
+                // AzureOpenAiEmbeddingService), so both modes are bounded by
+                // comparable timeouts for a fair side-by-side comparison.
+                command.CommandTimeout = 100;
                 command.Parameters.AddWithValue("@Question", question);
                 command.Parameters.AddWithValue("@MaxTokens", maxCompletionTokens);
                 command.Parameters.AddWithValue("@TopN", topN);
