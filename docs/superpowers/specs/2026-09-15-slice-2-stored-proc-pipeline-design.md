@@ -84,7 +84,7 @@ BEGIN
     DECLARE @returnValue INT;
 
     -- Step 1: Convert the question to an embedding
-    SELECT @questionVector = AI_GENERATE_EMBEDDINGS(@Question USE MODEL my_embedding_model);
+    SELECT @questionVector = AI_GENERATE_EMBEDDINGS(@Question USE MODEL brianminnich_embedding_model);
 
     -- Step 2: Retrieve relevant reviews using ANN vector search
     SET @context = (
@@ -278,6 +278,16 @@ Both `Sql/CreateCallLogTable.sql` and the modified `Sql/dbo.AskProductQuestion.s
 by hand against the real Azure SQL database — same manual-migration approach already used for the
 `ReviewEmbeddingJson` column in slice 1. The implementation plan will spell out the exact steps
 (run script X, verify table/procedure exists, then build/test).
+
+Before running the modified `dbo.AskProductQuestion.sql`, substitute the placeholder
+`your-openai-resource` in `@url`/`@credential` with the real endpoint, same as every other
+placeholder in this repo — never commit the real value. This is a one-time step only if the
+target Azure OpenAI resource itself is changing; slice 2 doesn't change which resource is used, so
+if it's the same resource already backing the current deployment, the existing scoped credential
+(matched by URL prefix) keeps working unchanged and no new credential needs to be created. Also
+confirm a `CREATE EXTERNAL MODEL` object named `brianminnich_embedding_model` exists in the target
+database (create or rename it to match if it currently has a different name) before running the
+script, since `USE MODEL` fails if no object by that exact name exists.
 
 ## Non-Goals (this slice)
 
