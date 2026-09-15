@@ -5,6 +5,22 @@
 (function () {
     "use strict";
 
+    // Explicit allowlist for rendering LLM answers, rather than trusting
+    // DOMPurify's full default profile. Covers what the system prompt's
+    // markdown (bold, bullets, paragraphs) actually produces plus a little
+    // headroom (links, code) - nothing broader. href is the only attribute
+    // allowed through, and the hook below forces rel="noopener noreferrer"
+    // on any link that makes it through.
+    var SANITIZE_CONFIG = {
+        ALLOWED_TAGS: ["p", "br", "strong", "em", "ul", "ol", "li", "code", "pre", "a"],
+        ALLOWED_ATTR: ["href"]
+    };
+    DOMPurify.addHook("afterSanitizeAttributes", function (node) {
+        if (node.tagName === "A") {
+            node.setAttribute("rel", "noopener noreferrer");
+        }
+    });
+
     // Reads which radio button (C# Pipeline / Stored Procedure) is
     // currently selected. Falls back to "CSharp" just in case nothing is
     // checked, though the markup always has one checked by default.
@@ -58,7 +74,7 @@
             bubble.appendChild(document.createTextNode(" " + text));
         } else {
             var body = document.createElement("div");
-            body.innerHTML = DOMPurify.sanitize(marked.parse(text));
+            body.innerHTML = DOMPurify.sanitize(marked.parse(text), SANITIZE_CONFIG);
             bubble.appendChild(body);
         }
 
