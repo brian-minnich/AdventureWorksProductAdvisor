@@ -44,8 +44,31 @@ namespace AdventureWorksProductAdvisor.Services
                 // no reader to read.
                 await command.ExecuteNonQueryAsync();
 
-                return new AskServiceResult { Success = true, Answer = answerParam.Value as string };
+                var answer = answerParam.Value as string;
+                return new AskServiceResult { Success = !IsProcedureError(answer), Answer = answer };
             }
+        }
+
+        // dbo.AskProductQuestion never raises a SQL error for an
+        // sp_invoke_external_rest_endpoint failure (429, 401/403, or any
+        // other non-zero status) - it catches those itself and puts a
+        // human-readable message straight into @Answer (see
+        // sql/dbo.AskProductQuestion.sql). Without this check, those
+        // failures looked identical to a real answer: Success = true, shown
+        // in the UI as a normal response, and logged to CallLog as a
+        // successful call. The three prefixes below are the procedure's own
+        // error strings; "No reviews found..." is deliberately NOT treated
+        // as an error here, matching CSharpAskService's equivalent
+        // no-matching-reviews case, which is also Success = true.
+        private static bool IsProcedureError(string answer)
+        {
+            if (answer == null)
+            {
+                return false;
+            }
+            return answer.StartsWith("The service is currently busy.")
+                || answer.StartsWith("Authentication failed.")
+                || answer.StartsWith("Unable to process your question at this time.");
         }
     }
 }
