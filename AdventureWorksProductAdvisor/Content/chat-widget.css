@@ -210,6 +210,15 @@ body {
     cursor: default;
 }
 
+/* Carry the selected mode's accent onto the other action controls, not just
+   the toggle itself - :not(:disabled) keeps the send button's disabled
+   (grey) look winning over this regardless of mode, since that selector is
+   more specific. */
+.page:has(input[value="StoredProc"]:checked) .stepper-btn.increment,
+.page:has(input[value="StoredProc"]:checked) .send-btn:not(:disabled) {
+    background: var(--accent-storedproc);
+}
+
 .chat-history {
     display: flex;
     flex-direction: column;
