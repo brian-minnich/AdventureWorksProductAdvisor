@@ -2,41 +2,61 @@
     ViewBag.Title = "AdventureWorks Product Advisor";
 }
 
-@* No Bootstrap/jQuery in this project - everything below is plain inline
-   styles rather than framework classes, and chat-widget.js uses only
-   built-in browser APIs (fetch, DOM methods). *@
-<div style="max-width: 700px; margin: 0 auto;">
-    <h2>AdventureWorks Product Advisor</h2>
+@* No Bootstrap/jQuery in this project - Content/chat-widget.css is a plain
+   stylesheet (no framework classes), and chat-widget.js uses only built-in
+   browser APIs (fetch, DOM methods). *@
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Quicksand:wght@600;700&family=Nunito+Sans:wght@400;600;700&display=swap" />
+<link rel="stylesheet" href="~/Content/chat-widget.css" />
+
+<div class="page">
+
+    <div>
+        <h1 class="app-title">AdventureWorks Product Advisor</h1>
+        <p class="app-tagline">Ask a question, see how two different &ldquo;brains&rdquo; answer it.</p>
+    </div>
 
     @* Which pipeline answers the next question - read by chat-widget.js's
-       getSelectedMode() and sent as "Mode" in the POST body. *@
-    <div style="margin-bottom: 12px;">
-        <label>
-            <input type="radio" name="mode" value="CSharp" checked="checked" /> C# Pipeline
+       getSelectedMode() and sent as "Mode" in the POST body. The radio
+       inputs are visually hidden (see .mode-option input in the
+       stylesheet); the label they sit inside is what's actually styled and
+       clicked, so this stays keyboard/screen-reader accessible. *@
+    <div class="mode-toggle">
+        <label class="mode-option" data-mode="CSharp">
+            <input type="radio" name="mode" value="CSharp" checked="checked" />
+            <span class="dot"></span>
+            C# Pipeline
         </label>
-        <label style="margin-left: 20px;">
-            <input type="radio" name="mode" value="StoredProc" /> Stored Procedure
+        <label class="mode-option" data-mode="StoredProc">
+            <input type="radio" name="mode" value="StoredProc" />
+            <span class="dot"></span>
+            Stored Procedure
         </label>
     </div>
 
-    @* min/max here are just a UI convenience (the native number-spinner
-       arrows clamp to this range) - AskController still validates TopN is
-       between 1 and 10 server-side regardless, since a direct API call
-       could send anything. *@
-    <div style="margin-bottom: 12px;">
-        <label for="topN">Reviews to retrieve (1-10):</label>
-        <input type="number" id="topN" min="1" max="10" step="1" value="5" style="width: 60px;" />
+    @* min/max here are just a UI convenience (both the spinner arrows and
+       the +/- buttons clamp to this range) - AskController still validates
+       TopN is between 1 and 10 server-side regardless, since a direct API
+       call could send anything. *@
+    <div class="stepper">
+        <label class="stepper-label" for="topN">Reviews to consider</label>
+        <div class="stepper-controls">
+            <button type="button" class="stepper-btn decrement" aria-label="Fewer reviews">&minus;</button>
+            <input type="number" id="topN" class="stepper-value" min="1" max="10" step="1" value="5" />
+            <button type="button" class="stepper-btn increment" aria-label="More reviews">+</button>
+        </div>
     </div>
 
-    <div style="margin-bottom: 12px;">
-        <input type="text" id="question" style="width: 100%; padding: 6px;" placeholder="Ask a question about our products..." />
+    <div class="ask-row">
+        <input type="text" id="question" class="ask-input" placeholder="Ask a question about our products..." />
+        @* Click handler and the Enter-key handler on #question are wired up
+           in chat-widget.js, not here. *@
+        <button type="button" id="askButton" class="send-btn" aria-label="Ask">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+        </button>
     </div>
 
-    @* Click handler for this button is wired up in chat-widget.js, not here. *@
-    <button type="button" id="askButton">Ask</button>
-
-    @* chat-widget.js appends one bubble per answer into this div. *@
-    <div id="chatHistory" style="margin-top: 20px;"></div>
+    @* chat-widget.js replaces this with one bubble-row per answer. *@
+    <div id="chatHistory" class="chat-history"></div>
 </div>
 
 @* @RenderSection("scripts") in _Layout.cshtml is what pulls this in, placed

@@ -48,37 +48,42 @@
         return history;
     }
 
-    // Replaces the history area with one chat bubble. Error text is a
-    // static app string (never LLM output), so it's still inserted as a
-    // plain text node. Success answers are raw LLM output formatted as
-    // markdown (the system prompt asks for **bold** and "- " bullets) -
-    // marked renders that to HTML and DOMPurify sanitizes it before it
-    // touches innerHTML, so characters like < or & in review content still
-    // can't be interpreted as live HTML/script.
+    // Short initials shown in the avatar circle - "[Mode]" text labels are
+    // gone from the bubble itself, so the avatar's color+initials are now
+    // what identifies which pipeline answered (see .avatar.mode-* in
+    // chat-widget.css for the actual colors).
+    var AVATAR_TEXT = { CSharp: "C#", StoredProc: "SP" };
+
+    // Replaces the history area with one avatar + message bubble. Error
+    // text is a static app string (never LLM output), so it's still
+    // inserted as a plain text node. Success answers are raw LLM output
+    // formatted as markdown (the system prompt asks for **bold** and "- "
+    // bullets) - marked renders that to HTML and DOMPurify sanitizes it
+    // before it touches innerHTML, so characters like < or & in review
+    // content still can't be interpreted as live HTML/script.
     function appendBubble(mode, text, isError) {
         var history = clearHistory();
+
+        var row = document.createElement("div");
+        row.className = "bubble-row";
+
+        var avatarClass = isError ? "mode-error" : (mode === "StoredProc" ? "mode-storedproc" : "mode-csharp");
+        var avatar = document.createElement("div");
+        avatar.className = "avatar " + avatarClass;
+        avatar.textContent = isError ? "!" : (AVATAR_TEXT[mode] || mode.slice(0, 2).toUpperCase());
+        row.appendChild(avatar);
+
         var bubble = document.createElement("div");
-        bubble.style.border = "1px solid #ccc";
-        bubble.style.borderRadius = "6px";
-        bubble.style.padding = "10px";
-        bubble.style.marginBottom = "10px";
-        if (isError) {
-            bubble.style.borderColor = "#a94442";
-            bubble.style.color = "#a94442";
-        }
-        var label = document.createElement("strong");
-        label.textContent = "[" + mode + "]";
-        bubble.appendChild(label);
+        bubble.className = "bubble" + (isError ? " is-error" : "");
 
         if (isError) {
-            bubble.appendChild(document.createTextNode(" " + text));
+            bubble.appendChild(document.createTextNode(text));
         } else {
-            var body = document.createElement("div");
-            body.innerHTML = DOMPurify.sanitize(marked.parse(text), SANITIZE_CONFIG);
-            bubble.appendChild(body);
+            bubble.innerHTML = DOMPurify.sanitize(marked.parse(text), SANITIZE_CONFIG);
         }
+        row.appendChild(bubble);
 
-        history.appendChild(bubble);
+        history.appendChild(row);
     }
 
     // Runs when the Ask button is clicked: reads the form, calls the API,
@@ -136,6 +141,18 @@
             });
     }
 
+    // Nudges the #topN input by +/-1, clamped to its own min/max (1-10) -
+    // the same range AskController enforces server-side regardless, so
+    // this is just keeping the stepper buttons consistent with the native
+    // number input they sit next to.
+    function stepTopN(delta) {
+        var topN = document.getElementById("topN");
+        var next = (parseInt(topN.value, 10) || 0) + delta;
+        var min = parseInt(topN.min, 10);
+        var max = parseInt(topN.max, 10);
+        topN.value = Math.min(max, Math.max(min, next));
+    }
+
     // Wait for the page to finish loading before wiring up event handlers,
     // since the elements don't exist in the DOM until then.
     document.addEventListener("DOMContentLoaded", function () {
@@ -148,6 +165,12 @@
             if (event.key === "Enter") {
                 askQuestion();
             }
+        });
+        document.querySelector(".stepper-btn.decrement").addEventListener("click", function () {
+            stepTopN(-1);
+        });
+        document.querySelector(".stepper-btn.increment").addEventListener("click", function () {
+            stepTopN(1);
         });
     });
 })();
