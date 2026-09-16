@@ -136,9 +136,18 @@
             });
     }
 
-    // Wait for the page to finish loading before wiring up the click
-    // handler, since the button doesn't exist in the DOM until then.
+    // Wait for the page to finish loading before wiring up event handlers,
+    // since the elements don't exist in the DOM until then.
     document.addEventListener("DOMContentLoaded", function () {
         document.getElementById("askButton").addEventListener("click", askQuestion);
+        // Enter submits the question, same as clicking Ask. The question
+        // input isn't inside a <form>, so Enter does nothing by default -
+        // this wires it up explicitly rather than adding a form element
+        // just to get free browser submit-on-Enter behavior.
+        document.getElementById("question").addEventListener("keydown", function (event) {
+            if (event.key === "Enter") {
+                askQuestion();
+            }
+        });
     });
 })();
