@@ -12,6 +12,15 @@
     --accent-csharp: oklch(0.7 0.12 280);
     --accent-storedproc: oklch(0.7 0.12 200);
     --accent-error: oklch(0.6 0.18 25);
+    --question-bg: oklch(0.94 0.015 280);
+}
+
+/* Without this, an element with an explicit width (%, or a fixed px value
+   like .sidebar's) still adds its padding and border on top of that width
+   instead of inside it - .sidebar's width:100% + padding is exactly that
+   trap, and it silently pushes the whole layout wider than the viewport. */
+*, *::before, *::after {
+    box-sizing: border-box;
 }
 
 body {
@@ -21,13 +30,28 @@ body {
     font-family: 'Nunito Sans', system-ui, sans-serif;
 }
 
-.page {
+/* #chatShell serves both layouts from one DOM tree: this base rule set is
+   the pre-first-question single centered panel; the .has-chat rules further
+   down (added by chat-widget.js once a question is submitted) turn the same
+   markup into the full-height sidebar + scrollable history app shell. */
+.chat-shell {
     max-width: 640px;
     margin: 0 auto;
     padding: 32px 20px 60px;
     display: flex;
     flex-direction: column;
     gap: 20px;
+    transition: opacity 0.15s ease;
+}
+
+.chat-shell.is-transitioning {
+    opacity: 0;
+}
+
+.header-bar {
+    padding: 0;
+    border: none;
+    background: transparent;
 }
 
 .app-title {
@@ -42,6 +66,35 @@ body {
     margin: 0;
     font-size: 14px;
     color: var(--ink-muted);
+}
+
+.shell-body {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.sidebar {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.new-chat-btn {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 10px;
+    border-radius: 14px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--ink-muted);
+    font-weight: 700;
+    font-size: 13px;
+    font-family: inherit;
+    cursor: pointer;
 }
 
 /* Mode toggle: real radio inputs, visually hidden, styled via the label
@@ -167,6 +220,24 @@ body {
     margin: 0;
 }
 
+.main-column {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.message-list {
+    display: none;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.input-bar {
+    padding: 0;
+    border: none;
+}
+
 .ask-row {
     display: flex;
     align-items: center;
@@ -214,15 +285,119 @@ body {
    the toggle itself - :not(:disabled) keeps the send button's disabled
    (grey) look winning over this regardless of mode, since that selector is
    more specific. */
-.page:has(input[value="StoredProc"]:checked) .stepper-btn.increment,
-.page:has(input[value="StoredProc"]:checked) .send-btn:not(:disabled) {
+.chat-shell:has(input[value="StoredProc"]:checked) .stepper-btn.increment,
+.chat-shell:has(input[value="StoredProc"]:checked) .send-btn:not(:disabled) {
     background: var(--accent-storedproc);
 }
 
-.chat-history {
+/* --- .has-chat: the app-shell layout, switched on after the first question
+   is submitted (see switchToChatView() in chat-widget.js). Same elements as
+   above, just repositioned/resized - nothing here is duplicated markup. --- */
+
+.chat-shell.has-chat {
+    max-width: none;
+    margin: 0;
+    padding: 0;
+    height: 100vh;
+    gap: 0;
+}
+
+.chat-shell.has-chat .header-bar {
+    padding: 18px 28px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+    flex-shrink: 0;
+}
+
+.chat-shell.has-chat .shell-body {
+    flex: 1;
+    min-height: 0;
+    flex-direction: row;
+    gap: 0;
+}
+
+.chat-shell.has-chat .sidebar {
+    width: 380px;
+    flex-shrink: 0;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    padding: 24px 20px;
+    animation: sidebar-in 0.25s ease;
+}
+
+@keyframes sidebar-in {
+    from { opacity: 0; transform: translateX(-12px); }
+    to { opacity: 1; transform: translateX(0); }
+}
+
+.chat-shell.has-chat .new-chat-btn {
     display: flex;
-    flex-direction: column;
-    gap: 16px;
+}
+
+.chat-shell.has-chat .main-column {
+    flex: 1;
+    min-width: 0;
+    /* min-height: 0 matters once the responsive rule below switches
+       .shell-body to flex-direction: column - without it, a flex item
+       stacked along the main axis defaults to a content-based minimum
+       height, so .message-list's overflow-y:auto below never gets a
+       chance to kick in and the whole page scrolls instead. */
+    min-height: 0;
+    gap: 0;
+}
+
+.chat-shell.has-chat .message-list {
+    display: flex;
+    flex: 1;
+    /* Same reason .main-column needs it above: without this, .message-list
+       won't shrink below its bubbles' natural stacked height when space is
+       tight, so overflow-y:auto never actually gets a chance to clip/
+       scroll and the content spills past .main-column's box instead. */
+    min-height: 0;
+    overflow-y: auto;
+    padding: 20px 28px;
+}
+
+.chat-shell.has-chat .input-bar {
+    padding: 16px 28px;
+    border-top: 1px solid var(--border);
+    flex-shrink: 0;
+}
+
+/* Responsive: below ~720px the sidebar stacks above the chat instead of
+   sitting beside it - same elements, just a column instead of a row, so no
+   hamburger/drawer is needed. */
+@media (max-width: 720px) {
+    .chat-shell.has-chat .shell-body {
+        flex-direction: column;
+    }
+
+    .chat-shell.has-chat .sidebar {
+        width: 100%;
+        /* .sidebar's flex-shrink:0 (set above, for the desktop row layout)
+           carries into this column layout too, so without a cap here it
+           would claim whatever height its content needs even on a short
+           viewport (e.g. a landscape phone), squeezing .message-list
+           toward zero. Capping it and letting it scroll internally
+           guarantees .main-column - the message list and, more
+           importantly, the input bar - always keeps a usable share of the
+           viewport. */
+        max-height: 35vh;
+        overflow-y: auto;
+        border-right: none;
+        border-bottom: 1px solid var(--border);
+    }
+}
+
+.question-bubble {
+    align-self: flex-end;
+    max-width: 72%;
+    background: var(--question-bg);
+    border-radius: 18px 4px 18px 18px;
+    padding: 12px 16px;
+    font-size: 14px;
+    line-height: 1.5;
+    color: var(--ink);
 }
 
 .bubble-row {
