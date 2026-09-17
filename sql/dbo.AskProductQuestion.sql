@@ -24,6 +24,25 @@ BEGIN
     DECLARE @response NVARCHAR(MAX);
     DECLARE @returnValue INT;
 
+    -- Sourced from dbo.AppConfig (see sql/CreateAppConfigTable.sql) rather
+    -- than hardcoded here, so deploying this procedure to a different
+    -- environment - or changing the chat deployment/API version - is a
+    -- one-row UPDATE to that table, not an edit to this procedure.
+    -- @endpoint is SYSNAME (not NVARCHAR) because it's also passed straight
+    -- through as @credential below - sp_invoke_external_rest_endpoint
+    -- resolves that value to a DATABASE SCOPED CREDENTIAL at execution
+    -- time, confirmed by running it directly against this database with
+    -- @credential set from a variable.
+    DECLARE @endpoint SYSNAME, @chatDeployment NVARCHAR(200), @apiVersion NVARCHAR(50);
+    SELECT
+        @endpoint = MAX(CASE WHEN ConfigKey = 'AzureOpenAiEndpoint' THEN ConfigValue END),
+        @chatDeployment = MAX(CASE WHEN ConfigKey = 'AzureOpenAiChatDeployment' THEN ConfigValue END),
+        @apiVersion = MAX(CASE WHEN ConfigKey = 'AzureOpenAiApiVersion' THEN ConfigValue END)
+    FROM dbo.AppConfig
+    WHERE ConfigKey IN ('AzureOpenAiEndpoint', 'AzureOpenAiChatDeployment', 'AzureOpenAiApiVersion');
+
+    DECLARE @chatUrl NVARCHAR(1000) = @endpoint + N'/openai/deployments/' + @chatDeployment + N'/chat/completions?api-version=' + @apiVersion;
+
     -- Holds the joined, approximate-search results exactly once - both the
     -- off-topic-question threshold check below and the prompt context built
     -- afterward read from this same table, so they can never disagree
@@ -119,12 +138,18 @@ BEGIN
         'temperature': 0.5
     );
 
-    -- Step 5: Call the model
+    -- Step 5: Call the model. Both @url and @credential are driven by
+    -- dbo.AppConfig's AzureOpenAiEndpoint value above - deploying to a
+    -- different environment is entirely a config-table change now, with
+    -- nothing left in this procedure's own text to edit. The credential
+    -- named by @endpoint still has to actually exist (CREATE DATABASE
+    -- SCOPED CREDENTIAL [...] - a one-time setup step per environment),
+    -- it's just no longer hardcoded here as well.
     EXECUTE @returnValue = sp_invoke_external_rest_endpoint
-        @url = N'https://your-openai-resource.openai.azure.com/openai/deployments/gpt-5.4-mini/chat/completions?api-version=2024-10-21',
+        @url = @chatUrl,
         @method = 'POST',
         @payload = @payload,
-        @credential = [https://your-openai-resource.openai.azure.com],
+        @credential = @endpoint,
         @response = @response OUTPUT;
 
     -- Step 6: Extract the answer or handle errors
