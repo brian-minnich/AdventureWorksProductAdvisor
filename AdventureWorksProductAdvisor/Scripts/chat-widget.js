@@ -26,6 +26,46 @@
     // .avatar.mode-* in chat-widget.css for the actual colors).
     var AVATAR_TEXT = { CSharp: "C#", StoredProc: "SP" };
 
+    // Up/down history for the question input, shell-style. questionHistory
+    // holds every question asked this chat (cleared by newChat() below);
+    // historyIndex points into it, with questionHistory.length itself
+    // meaning "not currently recalling - on the live/draft line". historyDraft
+    // stashes whatever the user had typed before their first Up press, so
+    // pressing Down back past the newest entry restores it instead of
+    // leaving the input blank.
+    var questionHistory = [];
+    var historyIndex = 0;
+    var historyDraft = "";
+
+    function resetQuestionHistory() {
+        questionHistory = [];
+        historyIndex = 0;
+        historyDraft = "";
+    }
+
+    // Moves the input through questionHistory by delta (-1 for Up, +1 for
+    // Down), stashing/restoring the in-progress draft at the boundaries.
+    function navigateQuestionHistory(questionInput, delta) {
+        if (questionHistory.length === 0) {
+            return;
+        }
+        if (delta < 0) {
+            if (historyIndex === 0) {
+                return;
+            }
+            if (historyIndex === questionHistory.length) {
+                historyDraft = questionInput.value;
+            }
+            historyIndex -= 1;
+        } else {
+            if (historyIndex === questionHistory.length) {
+                return;
+            }
+            historyIndex += 1;
+        }
+        questionInput.value = historyIndex === questionHistory.length ? historyDraft : questionHistory[historyIndex];
+    }
+
     // Reads which radio button (C# Pipeline / Stored Procedure) is
     // currently selected. Falls back to "CSharp" just in case nothing is
     // checked, though the markup always has one checked by default.
@@ -164,6 +204,7 @@
         fadeShell(shell, function () {
             document.getElementById("chatHistory").innerHTML = "";
             shell.classList.remove("has-chat");
+            resetQuestionHistory();
             askButton.disabled = false;
             newChatBtn.disabled = false;
             document.getElementById("question").focus();
@@ -197,6 +238,10 @@
         askButton.disabled = true;
         newChatBtn.disabled = true;
         questionInput.value = "";
+
+        questionHistory.push(question);
+        historyIndex = questionHistory.length;
+        historyDraft = "";
 
         appendQuestionBubble(question);
         var placeholder = appendAnswerPlaceholder(mode);
@@ -265,6 +310,12 @@
         document.getElementById("question").addEventListener("keydown", function (event) {
             if (event.key === "Enter") {
                 askQuestion();
+            } else if (event.key === "ArrowUp") {
+                event.preventDefault();
+                navigateQuestionHistory(event.target, -1);
+            } else if (event.key === "ArrowDown") {
+                event.preventDefault();
+                navigateQuestionHistory(event.target, 1);
             }
         });
         document.querySelector(".stepper-btn.decrement").addEventListener("click", function () {
