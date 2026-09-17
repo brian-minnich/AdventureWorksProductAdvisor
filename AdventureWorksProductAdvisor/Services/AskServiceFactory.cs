@@ -75,6 +75,28 @@ namespace AdventureWorksProductAdvisor.Services
                 ConfigurationManager.AppSettings["AzureOpenAiApiVersion"]);
         }
 
+        // Same fallback reasoning as AskController's GetMaxCompletionTokensFromConfig:
+        // a bad/missing config value falls back to CSharpAskService's own
+        // default (see its constructor) rather than crashing pipeline
+        // construction, which happens on every request.
+        private static double GetMinSimilarityScoreFromConfig()
+        {
+            double value;
+            // InvariantCulture, not the server's current culture - Web.config
+            // always writes this with a period ("0.35"), but double.TryParse
+            // without an explicit culture reads the decimal separator from
+            // the OS/thread culture. On a server whose culture uses "," for
+            // that (e.g. de-DE), a period is instead read as a thousands
+            // separator, so "0.35" would silently parse as 35 - not fail,
+            // just be wrong - and a threshold of 35 rejects every question,
+            // since cosine similarity never exceeds 1.
+            return double.TryParse(
+                ConfigurationManager.AppSettings["MinSimilarityScore"],
+                System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture,
+                out value) ? value : 0.35;
+        }
+
         public static ReviewEmbeddingBackfillRunner CreateBackfillRunner()
         {
             // Reuses the same Create* methods above rather than building a
@@ -85,11 +107,16 @@ namespace AdventureWorksProductAdvisor.Services
 
         public static IReadOnlyDictionary<string, IAskService> CreatePipelines()
         {
+            // Both pipelines get the same threshold from the same config
+            // read, so the off-topic-question guardrail behaves identically
+            // regardless of which one answers.
+            var minSimilarityScore = GetMinSimilarityScoreFromConfig();
+
             var csharpAskService = new CSharpAskService(
-                CreateReviewRepository(), CreateEmbeddingService(), CreateChatCompletionService());
+                CreateReviewRepository(), CreateEmbeddingService(), CreateChatCompletionService(), minSimilarityScore);
 
             var connectionString = ConfigurationManager.ConnectionStrings["AdventureWorksLT"].ConnectionString;
-            var storedProcAskService = new StoredProcAskService(connectionString);
+            var storedProcAskService = new StoredProcAskService(connectionString, minSimilarityScore);
 
             // This dictionary is what AskController.Post looks a Mode up in.
             // Adding a pipeline is just adding one more entry here -

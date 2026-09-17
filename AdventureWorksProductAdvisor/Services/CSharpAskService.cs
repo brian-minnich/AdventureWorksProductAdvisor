@@ -19,6 +19,20 @@ namespace AdventureWorksProductAdvisor.Services
         private readonly IEmbeddingService _embeddingService;
         private readonly IChatCompletionService _chatCompletionService;
 
+        // Below this cosine similarity, the best-matching review isn't
+        // actually about what was asked - see AskAsync's threshold check
+        // below. 0.35 was picked from real scores against this dataset's
+        // embeddings (text-embedding-3-small): clearly-unrelated questions
+        // ("What is the capital of France?", "How do I reset my email
+        // password?") scored ~0.13, and even an off-topic question that
+        // mimics a real product-recommendation question's phrasing ("What
+        // is the best car for a road trip?") only scored ~0.34, while
+        // genuine on-topic questions scored 0.47+. Still worth re-checking
+        // if the embedding deployment or review data changes meaningfully,
+        // since this is calibrated against a handful of examples, not a
+        // large sample.
+        private readonly double _minSimilarityScore;
+
         // SimilarityRanker is pure math with no dependencies of its own, so
         // unlike the three above it's just created directly here rather than
         // injected - there's nothing to fake, since its behavior is fully
@@ -26,11 +40,15 @@ namespace AdventureWorksProductAdvisor.Services
         private readonly SimilarityRanker _ranker = new SimilarityRanker();
 
         public CSharpAskService(
-            IReviewRepository reviewRepository, IEmbeddingService embeddingService, IChatCompletionService chatCompletionService)
+            IReviewRepository reviewRepository,
+            IEmbeddingService embeddingService,
+            IChatCompletionService chatCompletionService,
+            double minSimilarityScore = 0.35)
         {
             _reviewRepository = reviewRepository;
             _embeddingService = embeddingService;
             _chatCompletionService = chatCompletionService;
+            _minSimilarityScore = minSimilarityScore;
         }
 
         public async Task<AskServiceResult> AskAsync(string question, int maxCompletionTokens, int topN)
@@ -64,10 +82,27 @@ namespace AdventureWorksProductAdvisor.Services
                 };
             }
 
+            // Even the best match isn't actually close to the question (e.g.
+            // "what's the best car" against a bike-product review set) - stop
+            // here too, rather than sending clearly-off-topic questions to
+            // the chat model with irrelevant reviews as "context." Checking
+            // topReviews[0].Score (the highest of the bunch, since GetTopN
+            // orders descending) is a much cheaper guard than a dedicated
+            // classification call, and reuses a score this pipeline was
+            // already computing for ranking.
+            if (topReviews[0].Score < _minSimilarityScore)
+            {
+                return new AskServiceResult
+                {
+                    Success = true,
+                    Answer = "I can only answer questions about our products based on customer reviews. Please ask a product-related question."
+                };
+            }
+
             // Step 4: build a prompt containing the retrieved reviews plus
             // the original question, then ask the chat model to answer using
             // only that context.
-            var prompt = BuildPrompt(topReviews, question);
+            var prompt = BuildPrompt(topReviews.Select(r => r.Review).ToList(), question);
             var answer = await _chatCompletionService.GetCompletionAsync(prompt, maxCompletionTokens);
 
             return new AskServiceResult { Success = true, Answer = answer };

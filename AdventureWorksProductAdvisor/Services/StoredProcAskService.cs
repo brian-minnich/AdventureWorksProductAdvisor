@@ -16,9 +16,18 @@ namespace AdventureWorksProductAdvisor.Services
     {
         private readonly string _connectionString;
 
-        public StoredProcAskService(string connectionString)
+        // Same guardrail as CSharpAskService's minSimilarityScore, passed
+        // through to dbo.AskProductQuestion's own @MinSimilarityScore
+        // parameter (see Sql/dbo.AskProductQuestion.sql) rather than
+        // relying on that parameter's own default - AskServiceFactory feeds
+        // both pipelines the same Web.config value, so the two can't drift
+        // out of sync with each other.
+        private readonly double _minSimilarityScore;
+
+        public StoredProcAskService(string connectionString, double minSimilarityScore = 0.35)
         {
             _connectionString = connectionString;
+            _minSimilarityScore = minSimilarityScore;
         }
 
         public async Task<AskServiceResult> AskAsync(string question, int maxCompletionTokens, int topN)
@@ -35,6 +44,7 @@ namespace AdventureWorksProductAdvisor.Services
                 command.Parameters.AddWithValue("@Question", question);
                 command.Parameters.AddWithValue("@MaxTokens", maxCompletionTokens);
                 command.Parameters.AddWithValue("@TopN", topN);
+                command.Parameters.AddWithValue("@MinSimilarityScore", _minSimilarityScore);
                 var answerParam = command.Parameters.Add("@Answer", SqlDbType.NVarChar, -1);
                 answerParam.Direction = ParameterDirection.Output;
 

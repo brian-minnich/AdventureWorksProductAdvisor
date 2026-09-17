@@ -87,5 +87,42 @@ namespace AdventureWorksProductAdvisor.Tests.Services
             // useful to answer from.
             chatCompletionService.Verify(c => c.GetCompletionAsync(It.IsAny<string>(), It.IsAny<int>()), Times.Never);
         }
+
+        [TestMethod]
+        public async Task AskAsync_BestMatchBelowSimilarityThreshold_ReturnsOffTopicAnswerWithoutCallingChatCompletion()
+        {
+            // The question's embedding ({0,1}) is orthogonal to every
+            // review's embedding ({1,0}) - cosine similarity 0, same as
+            // asking a bike-product-review set about cars. With the 0.5
+            // threshold passed to the constructor below, that's well under
+            // the bar even though a review WAS found (unlike the
+            // no-matching-reviews test above, which has an empty review
+            // list) - this is what actually exercises the threshold check,
+            // not the emptiness check.
+            var reviews = new List<ReviewRecord>
+            {
+                new ReviewRecord { ReviewId = 1, ProductName = "Mountain Bike", Rating = 5, ReviewTitle = "Great", ReviewText = "Loved it", Embedding = new float[] { 1f, 0f } }
+            };
+
+            var reviewRepository = new Mock<IReviewRepository>();
+            reviewRepository.Setup(r => r.GetAllReviewsAsync()).ReturnsAsync(reviews);
+
+            var embeddingService = new Mock<IEmbeddingService>();
+            embeddingService.Setup(e => e.GetEmbeddingAsync("What's the best car for a road trip?"))
+                .ReturnsAsync(new float[] { 0f, 1f });
+
+            // No Setup calls on this mock at all - same reasoning as the
+            // no-matching-reviews test: if CSharpAskService called
+            // GetCompletionAsync anyway, the Verify below would catch it.
+            var chatCompletionService = new Mock<IChatCompletionService>();
+
+            var service = new CSharpAskService(reviewRepository.Object, embeddingService.Object, chatCompletionService.Object, minSimilarityScore: 0.5);
+
+            var result = await service.AskAsync("What's the best car for a road trip?", 500, 5);
+
+            Assert.IsTrue(result.Success);
+            Assert.AreEqual("I can only answer questions about our products based on customer reviews. Please ask a product-related question.", result.Answer);
+            chatCompletionService.Verify(c => c.GetCompletionAsync(It.IsAny<string>(), It.IsAny<int>()), Times.Never);
+        }
     }
 }

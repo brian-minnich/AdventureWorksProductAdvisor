@@ -13,8 +13,12 @@ namespace AdventureWorksProductAdvisor.Services
     {
         // Given a query embedding (the question, turned into a vector) and a
         // list of reviews (each with its own pre-computed embedding), returns
-        // the topN reviews whose embeddings are most similar to the query.
-        public List<ReviewRecord> GetTopN(IEnumerable<ReviewRecord> reviews, float[] queryEmbedding, int topN)
+        // the topN reviews whose embeddings are most similar to the query,
+        // together with the score each was ranked by - callers that need to
+        // tell "closely matched" apart from "nothing relevant" (e.g. to
+        // reject an off-topic question before paying for a chat completion
+        // call) need that score, not just the reviews themselves.
+        public List<RankedReview> GetTopN(IEnumerable<ReviewRecord> reviews, float[] queryEmbedding, int topN)
         {
             return reviews
                 // Skip reviews that were never embedded (Embedding is null
@@ -24,12 +28,11 @@ namespace AdventureWorksProductAdvisor.Services
                 // rather than throwing.
                 .Where(r => r.Embedding != null && r.Embedding.Length == queryEmbedding.Length)
                 // Score every remaining review by how similar it is to the question.
-                .Select(r => new { Review = r, Score = CosineSimilarity(r.Embedding, queryEmbedding) })
+                .Select(r => new RankedReview { Review = r, Score = CosineSimilarity(r.Embedding, queryEmbedding) })
                 // Highest similarity first...
                 .OrderByDescending(x => x.Score)
                 // ...and keep only as many as the caller asked for.
                 .Take(topN)
-                .Select(x => x.Review)
                 .ToList();
         }
 

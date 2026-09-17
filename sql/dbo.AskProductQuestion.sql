@@ -6,51 +6,99 @@ CREATE OR ALTER PROCEDURE [dbo].[AskProductQuestion]
     @Question NVARCHAR(1000),
     @MaxTokens INT = 500,
     @TopN INT = 5,
+    -- Mirrors CSharpAskService's minSimilarityScore (AdventureWorksProductAdvisor/Services/CSharpAskService.cs):
+    -- same 0.35 default, same check, same canned rejection message, so both
+    -- pipelines apply the same guardrail. StoredProcAskService passes the
+    -- same Web.config MinSimilarityScore value used by the C# pipeline,
+    -- rather than this default drifting out of sync with that one by hand.
+    @MinSimilarityScore FLOAT = 0.35,
     @Answer NVARCHAR(MAX) OUTPUT
 AS
 BEGIN
     SET NOCOUNT ON;
 
     DECLARE @questionVector VECTOR(1536);
+    DECLARE @topDistance FLOAT;
     DECLARE @context NVARCHAR(MAX);
     DECLARE @payload NVARCHAR(MAX);
     DECLARE @response NVARCHAR(MAX);
     DECLARE @returnValue INT;
 
+    -- Holds the joined, approximate-search results exactly once - both the
+    -- off-topic-question threshold check below and the prompt context built
+    -- afterward read from this same table, so they can never disagree
+    -- about what the "best match" is (an earlier version of this
+    -- guardrail ran a second, unjoined, non-approximate VECTOR_SEARCH just
+    -- for the threshold check - doubling the search cost and risking a
+    -- review that passes the threshold but doesn't survive these joins,
+    -- e.g. an orphaned ProductID, leaving @context NULL further down).
+    DECLARE @rankedReviews TABLE (
+        ProductName NVARCHAR(MAX),
+        ListPrice MONEY,
+        Category NVARCHAR(MAX),
+        Rating TINYINT,
+        ReviewTitle NVARCHAR(MAX),
+        ReviewText NVARCHAR(MAX),
+        Distance FLOAT
+    );
+
     -- Step 1: Convert the question to an embedding
     SELECT @questionVector = AI_GENERATE_EMBEDDINGS(@Question USE MODEL brianminnich_embedding_model);
 
-    -- Step 2: Retrieve relevant reviews using ANN vector search
-    SET @context = (
-        SELECT TOP (@TopN) WITH APPROXIMATE
-            p.Name AS ProductName,
-            p.ListPrice,
-            pc.Name AS Category,
-            r.Rating,
-            r.ReviewTitle,
-            r.ReviewText
-        FROM VECTOR_SEARCH(
-            TABLE = dbo.ProductReview AS r,
-            COLUMN = ReviewVector,
-            SIMILAR_TO = @questionVector,
-            METRIC = 'cosine'
-        ) AS vs
-        INNER JOIN SalesLT.Product p
-            ON r.ProductID = p.ProductID
-        INNER JOIN SalesLT.ProductCategory pc
-            ON p.ProductCategoryID = pc.ProductCategoryID
-        ORDER BY vs.distance
-        FOR JSON PATH
-    );
+    -- Step 2: Retrieve relevant reviews using ANN vector search, joined to
+    -- their product info, together with the distance each was found at.
+    INSERT INTO @rankedReviews (ProductName, ListPrice, Category, Rating, ReviewTitle, ReviewText, Distance)
+    SELECT TOP (@TopN) WITH APPROXIMATE
+        p.Name,
+        p.ListPrice,
+        pc.Name,
+        r.Rating,
+        r.ReviewTitle,
+        r.ReviewText,
+        vs.distance
+    FROM VECTOR_SEARCH(
+        TABLE = dbo.ProductReview AS r,
+        COLUMN = ReviewVector,
+        SIMILAR_TO = @questionVector,
+        METRIC = 'cosine'
+    ) AS vs
+    INNER JOIN SalesLT.Product p
+        ON r.ProductID = p.ProductID
+    INNER JOIN SalesLT.ProductCategory pc
+        ON p.ProductCategoryID = pc.ProductCategoryID
+    ORDER BY vs.distance;
 
-    -- Check if context was retrieved
-    IF @context IS NULL
+    -- Step 3: Check how close the single best-matching review is (the
+    -- first row above, since it was inserted in ascending-distance order),
+    -- before spending anything on a chat completion call - the same
+    -- cost-guard idea as CSharpAskService's threshold check against
+    -- SimilarityRanker's top score. VECTOR_SEARCH's cosine distance is
+    -- 1 - cosine_similarity (0 = identical, 1 = orthogonal), so a smaller
+    -- distance means a closer match.
+    SELECT TOP (1) @topDistance = Distance FROM @rankedReviews ORDER BY Distance;
+
+    IF @topDistance IS NULL
     BEGIN
         SET @Answer = 'No reviews found matching your query. Please try a different question.';
         RETURN;
     END
 
-    -- Step 3: Build the augmented prompt
+    IF (1.0 - @topDistance) < @MinSimilarityScore
+    BEGIN
+        SET @Answer = 'I can only answer questions about our products based on customer reviews. Please ask a product-related question.';
+        RETURN;
+    END
+
+    -- Step 4: Build @context (what the chat model reads as "product
+    -- reviews") from the same ranked reviews the threshold check above
+    -- just approved, then the augmented prompt around it.
+    SET @context = (
+        SELECT ProductName, ListPrice, Category, Rating, ReviewTitle, ReviewText
+        FROM @rankedReviews
+        ORDER BY Distance
+        FOR JSON PATH
+    );
+
     SET @payload = JSON_OBJECT(
         'messages': JSON_ARRAY(
             JSON_OBJECT(
@@ -71,7 +119,7 @@ BEGIN
         'temperature': 0.5
     );
 
-    -- Step 4: Call the model
+    -- Step 5: Call the model
     EXECUTE @returnValue = sp_invoke_external_rest_endpoint
         @url = N'https://your-openai-resource.openai.azure.com/openai/deployments/gpt-5.4-mini/chat/completions?api-version=2024-10-21',
         @method = 'POST',
@@ -79,7 +127,7 @@ BEGIN
         @credential = [https://your-openai-resource.openai.azure.com],
         @response = @response OUTPUT;
 
-    -- Step 5: Extract the answer or handle errors
+    -- Step 6: Extract the answer or handle errors
     IF @returnValue = 0
         SET @Answer = JSON_VALUE(@response, '$.result.choices[0].message.content');
     ELSE IF @returnValue = 429

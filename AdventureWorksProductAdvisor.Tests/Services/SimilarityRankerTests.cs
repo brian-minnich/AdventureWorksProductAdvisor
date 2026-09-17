@@ -30,7 +30,7 @@ namespace AdventureWorksProductAdvisor.Tests.Services
 
             var result = ranker.GetTopN(reviews, query, 3);
 
-            CollectionAssert.AreEqual(new[] { 2, 3, 1 }, result.Select(r => r.ReviewId).ToList());
+            CollectionAssert.AreEqual(new[] { 2, 3, 1 }, result.Select(r => r.Review.ReviewId).ToList());
         }
 
         [TestMethod]
@@ -50,7 +50,7 @@ namespace AdventureWorksProductAdvisor.Tests.Services
             var result = ranker.GetTopN(reviews, query, 2);
 
             Assert.AreEqual(2, result.Count);
-            CollectionAssert.AreEqual(new[] { 1, 2 }, result.Select(r => r.ReviewId).ToList());
+            CollectionAssert.AreEqual(new[] { 1, 2 }, result.Select(r => r.Review.ReviewId).ToList());
         }
 
         [TestMethod]
@@ -68,7 +68,7 @@ namespace AdventureWorksProductAdvisor.Tests.Services
 
             var result = ranker.GetTopN(reviews, query, 5);
 
-            CollectionAssert.AreEqual(new[] { 2 }, result.Select(r => r.ReviewId).ToList());
+            CollectionAssert.AreEqual(new[] { 2 }, result.Select(r => r.Review.ReviewId).ToList());
         }
 
         [TestMethod]
@@ -91,7 +91,29 @@ namespace AdventureWorksProductAdvisor.Tests.Services
 
             var result = ranker.GetTopN(reviews, query, 5);
 
-            CollectionAssert.AreEqual(new[] { 1 }, result.Select(r => r.ReviewId).ToList());
+            CollectionAssert.AreEqual(new[] { 1 }, result.Select(r => r.Review.ReviewId).ToList());
+        }
+
+        [TestMethod]
+        public void GetTopN_ReturnsTheActualCosineSimilarityScore()
+        {
+            // Identical vectors score exactly 1 (max similarity); orthogonal
+            // vectors score exactly 0 (no similarity) - this is what
+            // CSharpAskService's off-topic-question threshold check
+            // ultimately compares against, so the score itself (not just the
+            // resulting order) needs to be correct.
+            var query = new float[] { 1f, 0f };
+            var reviews = new List<ReviewRecord>
+            {
+                new ReviewRecord { ReviewId = 1, Embedding = new float[] { 1f, 0f } },
+                new ReviewRecord { ReviewId = 2, Embedding = new float[] { 0f, 1f } }
+            };
+            var ranker = new SimilarityRanker();
+
+            var result = ranker.GetTopN(reviews, query, 2);
+
+            Assert.AreEqual(1.0, result[0].Score, 0.0001);
+            Assert.AreEqual(0.0, result[1].Score, 0.0001);
         }
     }
 }
