@@ -69,6 +69,7 @@
     <Compile Include="Data\ReviewRecord.cs" />
     <Compile Include="Data\IReviewRepository.cs" />
     <Compile Include="Data\ReviewRepository.cs" />
+    <Compile Include="Data\SqlRetry.cs" />
     <Compile Include="Services\IEmbeddingService.cs" />
     <Compile Include="Services\AzureOpenAiEmbeddingService.cs" />
     <Compile Include="Services\IChatCompletionService.cs" />

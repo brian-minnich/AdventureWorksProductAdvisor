@@ -34,7 +34,7 @@ namespace AdventureWorksProductAdvisor.Data
             using (var connection = new SqlConnection(_connectionString))
             using (var command = new SqlCommand(sql, connection))
             {
-                await connection.OpenAsync();
+                await SqlRetry.OpenAsync(connection);
                 using (var reader = await command.ExecuteReaderAsync())
                 {
                     while (await reader.ReadAsync())
@@ -85,7 +85,7 @@ namespace AdventureWorksProductAdvisor.Data
                 // the SQL - this is what protects against SQL injection.
                 command.Parameters.AddWithValue("@Json", json);
                 command.Parameters.AddWithValue("@ReviewId", reviewId);
-                await connection.OpenAsync();
+                await SqlRetry.OpenAsync(connection);
                 await command.ExecuteNonQueryAsync();
             }
         }

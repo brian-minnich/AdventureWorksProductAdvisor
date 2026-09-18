@@ -1,6 +1,7 @@
 using System;
 using System.Data.SqlClient;
 using System.Threading.Tasks;
+using AdventureWorksProductAdvisor.Data;
 using AdventureWorksProductAdvisor.Models;
 
 namespace AdventureWorksProductAdvisor.Services
@@ -17,6 +18,12 @@ namespace AdventureWorksProductAdvisor.Services
             _connectionString = connectionString;
         }
 
+        // No SqlRetry here, deliberately: AskController's daily-cap check
+        // already fails open on ANY exception from this call (a broken
+        // CallLog table shouldn't block real Q&A) and treats it as
+        // under-the-limit. Retrying first would just add several seconds
+        // of delay in front of that existing fast fail-open path, on
+        // every request, for the entire time the database is unavailable.
         public async Task<int> GetTodaysCallCountAsync()
         {
             const string sql = "SELECT COUNT(*) FROM dbo.CallLog WHERE CallTimestamp >= @TodayStartUtc";
@@ -52,7 +59,11 @@ namespace AdventureWorksProductAdvisor.Services
                 command.Parameters.AddWithValue("@EstimatedOutputTokens", (object)entry.EstimatedOutputTokens ?? DBNull.Value);
                 command.Parameters.AddWithValue("@Success", entry.Success);
                 command.Parameters.AddWithValue("@ErrorMessage", (object)entry.ErrorMessage ?? DBNull.Value);
-                await connection.OpenAsync();
+                // Retries only the connect (see SqlRetry) - once the INSERT
+                // itself starts, a failure is left to propagate rather than
+                // being retried, so a transient error can't cause the same
+                // call to be logged twice.
+                await SqlRetry.OpenAsync(connection);
                 await command.ExecuteNonQueryAsync();
             }
         }

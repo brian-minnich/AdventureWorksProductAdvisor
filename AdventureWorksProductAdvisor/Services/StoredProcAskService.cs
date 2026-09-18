@@ -1,6 +1,7 @@
 using System.Data;
 using System.Data.SqlClient;
 using System.Threading.Tasks;
+using AdventureWorksProductAdvisor.Data;
 
 namespace AdventureWorksProductAdvisor.Services
 {
@@ -48,7 +49,12 @@ namespace AdventureWorksProductAdvisor.Services
                 var answerParam = command.Parameters.Add("@Answer", SqlDbType.NVarChar, -1);
                 answerParam.Direction = ParameterDirection.Output;
 
-                await connection.OpenAsync();
+                // Retries only the connect - by the time the stored proc
+                // (and its paid external REST call) starts running, the
+                // connection is known-good, so a transient failure from
+                // here on propagates instead of risking a second,
+                // separately-billed invocation of the same question.
+                await SqlRetry.OpenAsync(connection);
                 // The procedure has no result set - it only ever SETs
                 // @Answer - so ExecuteNonQueryAsync is correct here; there's
                 // no reader to read.
