@@ -1,0 +1,12 @@
+{
+    // Both .csproj files in this repo are deliberately classic non-SDK-style
+    // projects (ASP.NET MVC5 Web Application Project, .NET Framework 4.8,
+    // IIS-hosted) - there is no supported SDK-style equivalent for a WAP
+    // project. C# Dev Kit's language server only understands SDK-style
+    // projects and otherwise reports "Old C# projects are not supported by
+    // C# Dev Kit" in the Problems/Output panes. This falls back to the
+    // older OmniSharp-based language server, which does support legacy
+    // project files, so IntelliSense/go-to-def work without converting the
+    // project format. See CLAUDE.md for why the project stays non-SDK-style.
+    "dotnet.server.useOmnisharp": true
+}
