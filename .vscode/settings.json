@@ -8,5 +8,11 @@
     // older OmniSharp-based language server, which does support legacy
     // project files, so IntelliSense/go-to-def work without converting the
     // project format. See CLAUDE.md for why the project stays non-SDK-style.
+    //
+    // NOTE: this setting alone is NOT enough - dotnet.server.useOmnisharp is
+    // ignored while the C# Dev Kit extension is installed and enabled. You
+    // must also disable C# Dev Kit for this workspace: Extensions view ->
+    // C# Dev Kit -> gear icon -> "Disable (Workspace)" -> reload window.
+    // Confirmed working 2026-10-28.
     "dotnet.server.useOmnisharp": true
 }
