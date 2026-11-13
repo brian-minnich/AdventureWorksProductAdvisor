@@ -157,7 +157,7 @@ Never edit the tracked file's `@url`/`@credential` to the real value directly â€
 
 ```powershell
 # From the repo root. Replace <your-real-endpoint> with your actual
-# Azure OpenAI resource hostname (e.g. proj-brianminnich-ai-resource.openai.azure.com).
+# Azure OpenAI resource hostname (e.g. your-openai-resource.openai.azure.com).
 $real = "<your-real-endpoint>"
 (Get-Content "Sql\dbo.AskProductQuestion.sql" -Raw) `
     -replace "your-openai-resource\.openai\.azure\.com", $real |
